@@ -4,6 +4,7 @@ import { useGameStore } from "../store/gameStore";
 import { useAccountStore } from "../store/accountStore";
 import { GAME_VERSION, TOTAL_LEVELS, NEXT_UPDATE, VERSION_HISTORY } from "../game/gameConfig";
 import { sounds } from "../game/sounds";
+import { lobbyMusic } from "../game/lobbyMusic";
 
 function toggleFullscreen() {
   if (document.fullscreenElement) document.exitFullscreen?.();
@@ -31,6 +32,16 @@ export default function MainMenu() {
 
   const [onlineFriends, setOnlineFriends] = useState<{ userId: number; username: string }[]>([]);
   const [showVersion, setShowVersion] = useState(false);
+  const [musicOn, setMusicOn] = useState<boolean>(() => {
+    if (typeof localStorage === "undefined") return true;
+    return localStorage.getItem("mmm:music") !== "off";
+  });
+
+  useEffect(() => {
+    if (musicOn) lobbyMusic.start(); else lobbyMusic.stop();
+    if (typeof localStorage !== "undefined") localStorage.setItem("mmm:music", musicOn ? "on" : "off");
+    return () => lobbyMusic.stop();
+  }, [musicOn]);
 
   useEffect(() => {
     if (user) fetchFriends();
