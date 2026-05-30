@@ -36,11 +36,6 @@ export interface MultiplayerStore {
 
 import { API_BASE as BASE, wsUrl } from "../lib/gameApi";
 
-function wsUrl() {
-  const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-  return `${proto}//${window.location.host}/api/ws`;
-}
-
 export const useMultiplayerStore = create<MultiplayerStore>((set, get) => ({
   ws: null,
   lobbyId: null,
