@@ -54,9 +54,13 @@ function Btn({
 
 export default function MobileControls() {
   const screen = useGameStore((s) => s.screen);
-  const isMobile = "ontouchstart" in window || navigator.maxTouchPoints > 0;
+  const isMobile =
+    typeof window !== "undefined" &&
+    ("ontouchstart" in window || navigator.maxTouchPoints > 0);
 
-  if (!isMobile || screen !== "playing") return null;
+  // Show in single-player AND multiplayer/practice on touch devices.
+  const showOn = screen === "playing" || screen === "practice" || screen === "multiplayer";
+  if (!isMobile || !showOn) return null;
 
   return (
     <div
