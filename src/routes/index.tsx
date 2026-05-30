@@ -1,29 +1,29 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { ClientOnly } from "@/components/ClientOnly";
+import App from "@/App";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Your App" },
-      { name: "description", content: "Replace this with a one-sentence description of your app." },
-      { property: "og:title", content: "Your App" },
-      { property: "og:description", content: "Replace this with a one-sentence description of your app." },
+      { title: "Maze Mayhem Mania" },
+      { name: "description", content: "A pixel-perfect chaos platformer with daily AI-validated levels." },
+      { property: "og:title", content: "Maze Mayhem Mania" },
+      { property: "og:description", content: "A pixel-perfect chaos platformer with daily AI-validated levels." },
     ],
   }),
   component: Index,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
 function Index() {
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
+    <ClientOnly
+      fallback={
+        <div style={{ width: "100vw", height: "100vh", background: "#000", color: "#55ff22", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Courier New, monospace" }}>
+          Loading…
+        </div>
+      }
     >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
+      <App />
+    </ClientOnly>
   );
 }
