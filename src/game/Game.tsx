@@ -322,6 +322,11 @@ export default function Game() {
       if (e.code === "ArrowRight" || e.code === "KeyD") k.right = true;
       if ((e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") && !e.repeat)
         k.jumpJustPressed = true;
+      if ((e.code === "ShiftLeft" || e.code === "ShiftRight" || e.code === "KeyJ" || e.code === "KeyX") && !e.repeat)
+        k.dashJustPressed = true;
+      if ((e.code === "KeyP" || e.code === "Escape") && !e.repeat && winTimerRef.current < 0) {
+        if (e.code === "KeyP") { pausedRef.current = !pausedRef.current; e.preventDefault(); return; }
+      }
       if (e.code === "KeyF") toggleFS();
       if (e.code === "Escape") storeRef.current.setScreen("levelselect");
       e.preventDefault();
