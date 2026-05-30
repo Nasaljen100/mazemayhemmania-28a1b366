@@ -368,6 +368,8 @@ export default function Game() {
 
       // Mobile pause edge
       if (mob.pausePressed) { mob.pausePressed = false; if (winTimerRef.current < 0) pausedRef.current = !pausedRef.current; }
+      if (mob.restartPressed) { mob.restartPressed = false; respawn(); return; }
+      if (mob.fullscreenPressed) { mob.fullscreenPressed = false; toggleFS(); }
       if (pausedRef.current) {
         // consume edges so they don't fire when unpaused
         k.jumpJustPressed = false; k.dashJustPressed = false;
