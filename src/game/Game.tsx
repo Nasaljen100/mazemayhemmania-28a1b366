@@ -511,13 +511,13 @@ export default function Game() {
       }
 
       // Fallen off
-      if (p.y > LEVEL_H + TILE * 2) { sounds.die(); p.dead = true; p.deathTimer = 0; return; }
+      if (p.y > LEVEL_H + TILE * 2) { sounds.die(); p.dead = true; p.deathTimer = 0; spawnDeathFx(p, lv.accentColor); return; }
 
       // Spike death
       for (const sp of lv.spikes) {
         if (!sp.active) continue;
         if (rectOverlap(p.x + 3, p.y + 3, PLAYER_W - 6, PLAYER_H - 5, sp.x, sp.y, sp.w, sp.h)) {
-          sounds.spike(); p.dead = true; p.deathTimer = 0; return;
+          sounds.spike(); p.dead = true; p.deathTimer = 0; spawnDeathFx(p, lv.accentColor); return;
         }
       }
 
