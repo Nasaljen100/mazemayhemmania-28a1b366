@@ -249,6 +249,32 @@ export const useAccountStore = create<AccountStore>()(
           return [];
         }
       },
+
+      spendXpToSkip: (level, cost) => {
+        const { user } = get();
+        if (!user) return false;
+        if (user.xp < cost) return false;
+        // Deduct XP locally
+        set({ user: { ...user, xp: user.xp - cost } });
+        // Unlock the level and mark prior level cleared
+        import("./gameStore").then(({ useGameStore }) => {
+          const gs = useGameStore.getState();
+          const newCompleted = new Set(gs.completedLevels);
+          newCompleted.add(level - 1);
+          const newMax = Math.max(gs.maxUnlocked, level);
+          useGameStore.setState({ completedLevels: newCompleted, maxUnlocked: newMax });
+          const { token } = get();
+          if (token) {
+            get().saveProgress({
+              maxUnlocked: newMax,
+              completedLevels: Array.from(newCompleted),
+              deathsPerLevel: Object.fromEntries(Object.entries(gs.deathsPerLevel).map(([k, v]) => [k, v])),
+              totalDeaths: gs.totalDeaths,
+            });
+          }
+        });
+        return true;
+      },
     }),
     {
       name: "level-hinter-account",
