@@ -4,6 +4,7 @@ import { useGameStore } from "../store/gameStore";
 import { useAccountStore } from "../store/accountStore";
 import { GAME_VERSION, TOTAL_LEVELS, NEXT_UPDATE, VERSION_HISTORY } from "../game/gameConfig";
 import { sounds } from "../game/sounds";
+import { lobbyMusic } from "../game/lobbyMusic";
 
 function toggleFullscreen() {
   if (document.fullscreenElement) document.exitFullscreen?.();
@@ -31,6 +32,16 @@ export default function MainMenu() {
 
   const [onlineFriends, setOnlineFriends] = useState<{ userId: number; username: string }[]>([]);
   const [showVersion, setShowVersion] = useState(false);
+  const [musicOn, setMusicOn] = useState<boolean>(() => {
+    if (typeof localStorage === "undefined") return true;
+    return localStorage.getItem("mmm:music") !== "off";
+  });
+
+  useEffect(() => {
+    if (musicOn) lobbyMusic.start(); else lobbyMusic.stop();
+    if (typeof localStorage !== "undefined") localStorage.setItem("mmm:music", musicOn ? "on" : "off");
+    return () => lobbyMusic.stop();
+  }, [musicOn]);
 
   useEffect(() => {
     if (user) fetchFriends();
@@ -82,6 +93,13 @@ export default function MainMenu() {
 
       {/* Version badge (top-left) */}
       <div style={{ position: "absolute", top: 56, left: 16, zIndex: 10 }}>
+        <button onClick={() => setMusicOn((v) => !v)} style={{
+          background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)",
+          color: musicOn ? "#22ccff" : "rgba(255,255,255,0.3)", fontSize: 14, padding: "4px 8px",
+          cursor: "pointer", fontFamily: "inherit", marginRight: 6,
+        }} title={musicOn ? "Mute music" : "Play music"}>
+          {musicOn ? "🔊" : "🔇"}
+        </button>
         <button onClick={() => setShowVersion(!showVersion)} style={{
           background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)",
           color: "rgba(255,255,255,0.4)", fontSize: 10, padding: "4px 8px",
