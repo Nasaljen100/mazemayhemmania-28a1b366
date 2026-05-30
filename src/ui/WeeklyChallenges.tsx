@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useGameStore } from "../store/gameStore";
 import { TOTAL_LEVELS } from "../game/gameConfig";
-import { mulberry32 } from "../game/seededRandom";
+import { SeededRandom } from "../game/seededRandom";
 
 // ISO-week-based seed so the same 7 levels appear for everyone on the same week.
 function weekKey(d = new Date()): string {
@@ -16,9 +16,9 @@ function weekKey(d = new Date()): string {
 function pickWeeklyLevels(key: string): number[] {
   let seed = 0;
   for (let i = 0; i < key.length; i++) seed = (seed * 31 + key.charCodeAt(i)) | 0;
-  const rand = mulberry32(seed >>> 0);
+  const rng = new SeededRandom(seed >>> 0);
   const picks = new Set<number>();
-  while (picks.size < 7) picks.add(1 + Math.floor(rand() * TOTAL_LEVELS));
+  while (picks.size < 7) picks.add(rng.int(1, TOTAL_LEVELS));
   return [...picks].sort((a, b) => a - b);
 }
 
