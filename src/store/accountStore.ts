@@ -61,6 +61,7 @@ export interface AccountStore {
   sendFriendRequest: (friendId: number) => Promise<void>;
   acceptFriend: (friendId: number) => Promise<void>;
   searchUser: (q: string) => Promise<AccountUser[]>;
+  spendXpToSkip: (level: number, cost: number) => boolean;
   dismissXpBanner: () => void;
   setError: (e: string | null) => void;
   startHeartbeat: (token: string) => void;
