@@ -6,9 +6,14 @@ export interface MobileInput {
   right: boolean;
   jump: boolean;
   jumpPressed: boolean;
+  dashPressed: boolean;
+  pausePressed: boolean;
 }
 
-export const mobileInput: MobileInput = { left: false, right: false, jump: false, jumpPressed: false };
+export const mobileInput: MobileInput = {
+  left: false, right: false, jump: false, jumpPressed: false,
+  dashPressed: false, pausePressed: false,
+};
 
 function Btn({
   label,
@@ -91,7 +96,18 @@ export default function MobileControls() {
       </div>
 
       {/* Jump */}
-      <div style={{ pointerEvents: "auto" }}>
+      <div style={{ pointerEvents: "auto", display: "flex", gap: 10, alignItems: "flex-end" }}>
+        <Btn
+          label="⚡"
+          onDown={() => { mobileInput.dashPressed = true; }}
+          onUp={() => {}}
+          style={{
+            width: 64,
+            height: 64,
+            background: "rgba(80,180,255,0.25)",
+            border: "3px solid rgba(120,210,255,0.6)",
+          }}
+        />
         <Btn
           label="↑"
           onDown={() => { mobileInput.jump = true; mobileInput.jumpPressed = true; }}
