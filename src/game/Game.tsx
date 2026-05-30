@@ -519,7 +519,7 @@ export default function Game() {
         if (tr.x >= tr.patrolRight) { tr.x = tr.patrolRight; tr.vx = -Math.abs(tr.vx); }
         // Troll kills player
         if (!p.dead && rectOverlap(p.x + 2, p.y + 2, PLAYER_W - 4, PLAYER_H - 4, tr.x, tr.y, TROLL_W, TROLL_H)) {
-          sounds.troll(); p.dead = true; p.deathTimer = 0;
+          sounds.troll(); p.dead = true; p.deathTimer = 0; spawnDeathFx(p, lv.accentColor);
         }
       }
 
@@ -552,7 +552,10 @@ export default function Game() {
 
       ctx.imageSmoothingEnabled = false;
       ctx.save();
-      ctx.translate(-Math.round(camX), 0);
+      const sh = shakeRef.current;
+      const sx = sh > 0 ? (Math.random() - 0.5) * (sh / 60) : 0;
+      const sy = sh > 0 ? (Math.random() - 0.5) * (sh / 60) : 0;
+      ctx.translate(-Math.round(camX) + sx, sy);
 
       drawBg(ctx, lv.bgColor, camX);
       px(ctx, Math.round(camX), LEVEL_H, BASE_W, BASE_H, "rgba(0,0,0,0.75)");
@@ -561,7 +564,24 @@ export default function Game() {
       drawDoor(ctx, lv.door, winTimerRef.current >= 0);
       for (const sp of lv.spikes) drawSpike(ctx, sp);
       for (const tr of lv.trolls) drawTroll(ctx, tr, now);
-      drawPlayer(ctx, p, lv.accentColor);
+      if (!p.dead) {
+        // Dash trail
+        if (p.dashTimer > 0) {
+          for (let i = 1; i <= 3; i++) {
+            ctx.globalAlpha = 0.18 * i;
+            px(ctx, p.x - p.dashDir * i * 4, p.y, PLAYER_W, PLAYER_H, lv.accentColor);
+          }
+          ctx.globalAlpha = 1;
+        }
+        drawPlayer(ctx, p, lv.accentColor);
+      }
+      // Particles
+      for (const pt of particlesRef.current) {
+        const a = Math.max(0, Math.min(1, pt.life / 500));
+        ctx.globalAlpha = a;
+        px(ctx, pt.x, pt.y, 2, 2, pt.color);
+      }
+      ctx.globalAlpha = 1;
 
       // Win overlay
       if (winTimerRef.current >= 0) {
@@ -590,7 +610,12 @@ export default function Game() {
       ctx.textAlign = "left";
       ctx.fillText("ESC=EXIT", 3, 6.5);
       ctx.textAlign = "right";
-      ctx.fillText("F=FULL", BASE_W - 3, 6.5);
+      ctx.fillText("P=PAUSE F=FULL", BASE_W - 3, 6.5);
+
+      // Dash cooldown indicator (bottom-left, in-canvas HUD)
+      const cdPct = 1 - Math.max(0, Math.min(1, p.dashCooldown / DASH_COOLDOWN_MS));
+      px(ctx, 4, BASE_H - 8, 30, 3, "rgba(255,255,255,0.12)");
+      px(ctx, 4, BASE_H - 8, 30 * cdPct, 3, cdPct >= 1 ? "#7cdcff" : "#3a6a88");
 
       // Win banner
       if (winTimerRef.current >= 0) {
@@ -607,6 +632,19 @@ export default function Game() {
         const pct = Math.min(1, winTimerRef.current / 1000);
         px(ctx, BASE_W / 2 - 60, BASE_H / 2 + 14, 120, 3, "rgba(255,255,255,0.1)");
         px(ctx, BASE_W / 2 - 60, BASE_H / 2 + 14, 120 * pct, 3, "#ffee22");
+      }
+
+      // Pause overlay
+      if (pausedRef.current) {
+        ctx.fillStyle = "rgba(0,0,0,0.7)";
+        ctx.fillRect(0, 0, BASE_W, BASE_H);
+        ctx.fillStyle = "#ffee22";
+        ctx.textAlign = "center";
+        ctx.font = "bold 12px 'Courier New', monospace";
+        ctx.fillText("PAUSED", BASE_W / 2, BASE_H / 2 - 8);
+        ctx.fillStyle = "rgba(255,255,255,0.7)";
+        ctx.font = "bold 7px 'Courier New', monospace";
+        ctx.fillText("P = RESUME   ESC = EXIT", BASE_W / 2, BASE_H / 2 + 6);
       }
     }
 
