@@ -324,6 +324,7 @@ export default function Game() {
         k.jumpJustPressed = true;
       if ((e.code === "ShiftLeft" || e.code === "ShiftRight" || e.code === "KeyJ" || e.code === "KeyX") && !e.repeat)
         k.dashJustPressed = true;
+      if (e.code === "KeyR" && !e.repeat) { respawn(); e.preventDefault(); return; }
       if ((e.code === "KeyP" || e.code === "Escape") && !e.repeat && winTimerRef.current < 0) {
         if (e.code === "KeyP") { pausedRef.current = !pausedRef.current; e.preventDefault(); return; }
       }
