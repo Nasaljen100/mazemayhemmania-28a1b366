@@ -1,3 +1,4 @@
+import { apiUrl } from "../lib/gameApi";
 import { useEffect, useState } from "react";
 import { useGameStore } from "../store/gameStore";
 import { useAccountStore } from "../store/accountStore";
@@ -39,7 +40,7 @@ export default function MainMenu() {
     if (!token) return;
     async function fetchOnline() {
       try {
-        const r = await fetch("/api/online/friends", { headers: { "x-session-token": token! } });
+        const r = await fetch(apiUrl("/online/friends"), { headers: { "x-session-token": token! } });
         if (r.ok) { const d = await r.json(); setOnlineFriends(d.online ?? []); }
       } catch {}
     }

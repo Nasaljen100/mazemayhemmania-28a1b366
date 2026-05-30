@@ -34,9 +34,9 @@ export interface MultiplayerStore {
   setError: (e: string | null) => void;
 }
 
-const BASE = "/api";
+import { API_BASE as BASE, wsUrl } from "../lib/gameApi";
 
-function getWsUrl() {
+function wsUrl() {
   const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
   return `${proto}//${window.location.host}/api/ws`;
 }
@@ -58,7 +58,7 @@ export const useMultiplayerStore = create<MultiplayerStore>((set, get) => ({
     const existing = get().ws;
     if (existing && existing.readyState === WebSocket.OPEN) return;
 
-    const ws = new WebSocket(getWsUrl());
+    const ws = new WebSocket(wsUrl());
 
     ws.onopen = () => {
       set({ connected: true, error: null });

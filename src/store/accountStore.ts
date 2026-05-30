@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-const BASE = "/api";
+import { API_BASE as BASE, wsUrl } from "../lib/gameApi";
 
 export interface AccountUser {
   id: number;

@@ -1,3 +1,4 @@
+import { apiUrl } from "../lib/gameApi";
 import { useEffect, useState } from "react";
 import { useAccountStore, AccountUser } from "../store/accountStore";
 import { sounds } from "../game/sounds";
@@ -32,7 +33,7 @@ export default function FriendsScreen({ onBack }: { onBack: () => void }) {
   async function fetchOnline() {
     if (!token) return;
     try {
-      const r = await fetch("/api/online/friends", { headers: { "x-session-token": token } });
+      const r = await fetch(apiUrl("/online/friends"), { headers: { "x-session-token": token } });
       if (r.ok) { const d = await r.json(); setOnlineFriends(d.online ?? []); }
     } catch {}
   }
@@ -40,7 +41,7 @@ export default function FriendsScreen({ onBack }: { onBack: () => void }) {
   async function fetchSuggested() {
     if (!token) return;
     try {
-      const r = await fetch("/api/users/suggested", { headers: { "x-session-token": token } });
+      const r = await fetch(apiUrl("/users/suggested"), { headers: { "x-session-token": token } });
       if (r.ok) { const d = await r.json(); setSuggested(d.users ?? []); }
     } catch {}
   }
@@ -54,7 +55,7 @@ export default function FriendsScreen({ onBack }: { onBack: () => void }) {
     // If it's a numeric ID, search by ID
     if (/^\d+$/.test(q)) {
       try {
-        const r = await fetch(`/api/users/id/${q}`, { headers: { "x-session-token": token! } });
+        const r = await fetch(apiUrl(`/users/id/${q}`), { headers: { "x-session-token": token! } });
         if (r.ok) { const d = await r.json(); setResults([d.user].filter(u => u.id !== user?.id)); }
         else setResults([]);
       } catch { setResults([]); }
