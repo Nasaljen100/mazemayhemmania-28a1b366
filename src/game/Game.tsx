@@ -14,6 +14,12 @@ const MOVE_SPEED = 2.6;
 const PLAYER_W = 14;
 const PLAYER_H = 18;
 const MAX_FALL = 10;
+const COYOTE_MS = 110;
+const BUFFER_MS = 140;
+const DASH_MS = 160;
+const DASH_SPEED = 6.2;
+const DASH_COOLDOWN_MS = 650;
+const MAX_JUMPS = 2;
 
 interface Player {
   x: number; y: number;
@@ -23,9 +29,19 @@ interface Player {
   deathTimer: number;
   facingRight: boolean;
   walkTimer: number;
+  jumpsLeft: number;
+  coyote: number;
+  buffer: number;
+  dashTimer: number;
+  dashCooldown: number;
+  dashDir: number;
 }
 
-interface Keys { left: boolean; right: boolean; jumpJustPressed: boolean; }
+interface Keys {
+  left: boolean; right: boolean;
+  jumpJustPressed: boolean;
+  dashJustPressed: boolean;
+}
 
 function rectOverlap(ax: number, ay: number, aw: number, ah: number,
                      bx: number, by: number, bw: number, bh: number) {
