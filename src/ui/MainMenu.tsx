@@ -170,12 +170,12 @@ export default function MainMenu() {
 
       {/* Title */}
       <div style={{ textAlign: "center", marginBottom: 24, position: "relative", zIndex: 1 }}>
-        <div style={{ fontSize: "clamp(28px,7vw,64px)", fontWeight: 900, color: "#ffee22",
+        <div style={{ fontSize: "clamp(24px,6vw,52px)", fontWeight: 900, color: "#ffee22",
           textShadow: "0 0 30px #ffaa00, 4px 4px 0 #aa6600, -1px -1px 0 #000",
-          letterSpacing: "0.12em", lineHeight: 1 }}>LEVEL</div>
-        <div style={{ fontSize: "clamp(28px,7vw,64px)", fontWeight: 900, color: "#ff3300",
+          letterSpacing: "0.12em", lineHeight: 1 }}>MAZE MAYHEM</div>
+        <div style={{ fontSize: "clamp(36px,9vw,76px)", fontWeight: 900, color: "#ff3300",
           textShadow: "0 0 30px #ff0000, 4px 4px 0 #660000, -1px -1px 0 #000",
-          letterSpacing: "0.12em", lineHeight: 1 }}>HINTER</div>
+          letterSpacing: "0.18em", lineHeight: 1, marginTop: 4 }}>MANIA</div>
         <div style={{ fontSize: "clamp(10px,2vw,13px)", letterSpacing: "0.3em", color: "rgba(255,255,255,0.35)", marginTop: 10 }}>
           {TOTAL_LEVELS} LEVELS · TRAPS AWAIT
         </div>
@@ -206,6 +206,11 @@ export default function MainMenu() {
           <MenuBtn label="🎯 PRACTICE" color="#334455" glow="#223" onClick={() => { sounds.menuClick(); setScreen("practice" as any); }} half />
           <MenuBtn label={`🎮 MULTI${onlineCount > 0 ? ` (${onlineCount})` : ""}`} color="#1a2a5a" glow="#112244"
             onClick={() => { sounds.menuClick(); if (user) setScreen("lobby" as any); else setScreen("auth" as any); }} half />
+        </div>
+
+        <div style={{ display: "flex", gap: 8, width: "100%" }}>
+          <MenuBtn label="🤖 WEEKLY AI" color="#1a663a" glow="#0a4422" onClick={() => { sounds.menuClick(); setScreen("weekly" as any); }} half />
+          <MenuBtn label="🏆 LEADERBOARD" color="#664422" glow="#442211" onClick={() => { sounds.menuClick(); setScreen("leaderboard" as any); }} half />
         </div>
 
         {user ? (
