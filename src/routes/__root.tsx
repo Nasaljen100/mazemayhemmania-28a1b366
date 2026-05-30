@@ -85,6 +85,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "Maze Mayhem Mania" },
+      { name: "twitter:description", content: "Maze Mayhem Mania — a pixel-perfect chaos platformer with daily AI-validated levels." },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/7ac403d0-4da2-4896-b9fa-59c8a9b88d8c" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/7ac403d0-4da2-4896-b9fa-59c8a9b88d8c" },
     ],
     links: [
       {
