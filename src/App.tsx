@@ -13,12 +13,15 @@ import PracticeGame from "./ui/PracticeGame";
 import LobbyScreen from "./ui/LobbyScreen";
 import MultiplayerGame from "./ui/MultiplayerGame";
 import XpBanner from "./ui/XpBanner";
+import Leaderboard from "./ui/Leaderboard";
+import WeeklyChallenges from "./ui/WeeklyChallenges";
 import { startLevelValidator } from "./game/levelValidator";
 import "./game-styles.css";
 
 type Screen =
   | "menu" | "levelselect" | "playing" | "practice"
-  | "auth" | "quests" | "friends" | "lobby" | "multiplayer";
+  | "auth" | "quests" | "friends" | "lobby" | "multiplayer"
+  | "leaderboard" | "weekly";
 
 export default function App() {
   const screen = useGameStore((s) => s.screen) as Screen;
@@ -58,6 +61,8 @@ export default function App() {
       {screen === "auth" && <AuthScreen onBack={() => setScreen("menu")} />}
       {screen === "quests" && <QuestsScreen onBack={() => setScreen("menu")} />}
       {screen === "friends" && <FriendsScreen onBack={() => setScreen("menu")} />}
+      {screen === "leaderboard" && <Leaderboard />}
+      {screen === "weekly" && <WeeklyChallenges />}
       {screen === "lobby" && (
         <LobbyScreen
           onStart={() => setScreen("multiplayer")}
