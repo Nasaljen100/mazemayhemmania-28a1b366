@@ -345,6 +345,19 @@ export default function Game() {
     let animId: number;
     const FDT = 1000 / 60;
 
+    function spawnDeathFx(p: Player, color: string) {
+      shakeRef.current = 260;
+      for (let i = 0; i < 22; i++) {
+        const ang = (Math.PI * 2 * i) / 22 + Math.random() * 0.3;
+        const sp = 1.5 + Math.random() * 2.4;
+        particlesRef.current.push({
+          x: p.x + PLAYER_W / 2, y: p.y + PLAYER_H / 2,
+          vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 1,
+          life: 600, color: Math.random() < 0.4 ? "#ff3322" : color,
+        });
+      }
+    }
+
     function update() {
       const lv = levelRef.current;
       const p = playerRef.current;
