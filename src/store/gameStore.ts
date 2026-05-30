@@ -1,6 +1,9 @@
 import { create } from "zustand";
 
-export type AppScreen = "menu" | "levelselect" | "playing" | "practice" | "auth" | "quests" | "friends" | "lobby" | "multiplayer";
+export type AppScreen =
+  | "menu" | "levelselect" | "playing" | "practice"
+  | "auth" | "quests" | "friends" | "lobby" | "multiplayer"
+  | "leaderboard" | "weekly" | "settings";
 
 export interface GameStore {
   screen: AppScreen;
