@@ -352,6 +352,15 @@ export default function Game() {
       const mob = mobileInput;
       const now = Date.now();
 
+      // Mobile pause edge
+      if (mob.pausePressed) { mob.pausePressed = false; if (winTimerRef.current < 0) pausedRef.current = !pausedRef.current; }
+      if (pausedRef.current) {
+        // consume edges so they don't fire when unpaused
+        k.jumpJustPressed = false; k.dashJustPressed = false;
+        mob.jumpPressed = false; mob.dashPressed = false;
+        return;
+      }
+
       // Win: auto-advance to next level
       if (winTimerRef.current >= 0) {
         winTimerRef.current += FDT;
@@ -370,6 +379,12 @@ export default function Game() {
 
       if (p.dead) {
         p.deathTimer += FDT;
+        // Update death particles
+        for (const pt of particlesRef.current) {
+          pt.vy += 0.25; pt.x += pt.vx; pt.y += pt.vy; pt.life -= FDT;
+        }
+        particlesRef.current = particlesRef.current.filter(pt => pt.life > 0);
+        if (shakeRef.current > 0) shakeRef.current = Math.max(0, shakeRef.current - FDT);
         if (p.deathTimer > 750) {
           storeRef.current.addDeath(levelNumRef.current);
           respawn();
@@ -380,19 +395,68 @@ export default function Game() {
       const goL = k.left || mob.left;
       const goR = k.right || mob.right;
       const jump = k.jumpJustPressed || mob.jumpPressed;
+      const dash = k.dashJustPressed || mob.dashPressed;
       k.jumpJustPressed = false;
+      k.dashJustPressed = false;
       mob.jumpPressed = false;
+      mob.dashPressed = false;
 
-      p.vx = 0;
-      if (goL) { p.vx = -MOVE_SPEED; p.facingRight = false; }
-      if (goR) { p.vx = MOVE_SPEED; p.facingRight = true; }
-      if (goL && goR) p.vx = 0;
+      // Timers
+      if (p.coyote > 0) p.coyote -= FDT;
+      if (p.buffer > 0) p.buffer -= FDT;
+      if (p.dashTimer > 0) p.dashTimer -= FDT;
+      if (p.dashCooldown > 0) p.dashCooldown -= FDT;
 
-      if (jump && p.onGround) { p.vy = JUMP_VY; p.onGround = false; sounds.jump(); }
-      p.vy = Math.min(p.vy + GRAVITY, MAX_FALL);
+      if (jump) p.buffer = BUFFER_MS;
+
+      // Horizontal input (suspended during dash)
+      if (p.dashTimer > 0) {
+        p.vx = DASH_SPEED * p.dashDir;
+        if (goL) p.facingRight = false;
+        if (goR) p.facingRight = true;
+      } else {
+        p.vx = 0;
+        if (goL) { p.vx = -MOVE_SPEED; p.facingRight = false; }
+        if (goR) { p.vx = MOVE_SPEED; p.facingRight = true; }
+        if (goL && goR) p.vx = 0;
+      }
+
+      // Dash trigger
+      if (dash && p.dashCooldown <= 0 && p.dashTimer <= 0) {
+        p.dashTimer = DASH_MS;
+        p.dashCooldown = DASH_COOLDOWN_MS;
+        p.dashDir = goL && !goR ? -1 : goR && !goL ? 1 : (p.facingRight ? 1 : -1);
+        p.vy = 0;
+        sounds.jump();
+      }
+
+      // Jump (with coyote + buffer + double jump)
+      if (p.buffer > 0) {
+        if (p.onGround || p.coyote > 0) {
+          p.vy = JUMP_VY; p.onGround = false; p.coyote = 0; p.buffer = 0;
+          p.jumpsLeft = MAX_JUMPS - 1;
+          sounds.jump();
+        } else if (p.jumpsLeft > 0) {
+          p.vy = JUMP_VY * 0.92; p.jumpsLeft -= 1; p.buffer = 0;
+          sounds.jump();
+          // Double-jump puff
+          for (let i = 0; i < 6; i++) {
+            particlesRef.current.push({
+              x: p.x + PLAYER_W/2, y: p.y + PLAYER_H,
+              vx: (Math.random()-0.5)*1.6, vy: Math.random()*1.2,
+              life: 260, color: "rgba(255,255,255,0.7)",
+            });
+          }
+        }
+      }
+
+      // Gravity (reduced during dash for floaty effect)
+      if (p.dashTimer > 0) p.vy = 0;
+      else p.vy = Math.min(p.vy + GRAVITY, MAX_FALL);
 
       p.x += p.vx;
       p.x = Math.max(0, Math.min(p.x, lv.widthPx - PLAYER_W));
+      const wasOnGround = p.onGround;
       p.onGround = false;
       for (const plat of lv.platforms) resolveX(p, plat);
 
@@ -406,6 +470,14 @@ export default function Game() {
         if (!landed && plat.type === "disappear" && !plat.disappearing) {
           plat.standTimer = Math.max(0, plat.standTimer - FDT * 2);
         }
+      }
+      // Coyote time + reset jumps on landing
+      if (p.onGround) {
+        p.coyote = COYOTE_MS;
+        p.jumpsLeft = MAX_JUMPS;
+      } else if (wasOnGround) {
+        // leaving ground without jumping — keep coyote
+        p.coyote = COYOTE_MS;
       }
 
       // Update platforms
