@@ -14,6 +14,12 @@ const MOVE_SPEED = 2.6;
 const PLAYER_W = 14;
 const PLAYER_H = 18;
 const MAX_FALL = 10;
+const COYOTE_MS = 110;
+const BUFFER_MS = 140;
+const DASH_MS = 160;
+const DASH_SPEED = 6.2;
+const DASH_COOLDOWN_MS = 650;
+const MAX_JUMPS = 2;
 
 interface Player {
   x: number; y: number;
@@ -23,9 +29,19 @@ interface Player {
   deathTimer: number;
   facingRight: boolean;
   walkTimer: number;
+  jumpsLeft: number;
+  coyote: number;
+  buffer: number;
+  dashTimer: number;
+  dashCooldown: number;
+  dashDir: number;
 }
 
-interface Keys { left: boolean; right: boolean; jumpJustPressed: boolean; }
+interface Keys {
+  left: boolean; right: boolean;
+  jumpJustPressed: boolean;
+  dashJustPressed: boolean;
+}
 
 function rectOverlap(ax: number, ay: number, aw: number, ah: number,
                      bx: number, by: number, bw: number, bh: number) {
@@ -251,10 +267,15 @@ export default function Game() {
     x: 0, y: 0, vx: 0, vy: 0,
     onGround: false, dead: false, deathTimer: 0,
     facingRight: true, walkTimer: 0,
+    jumpsLeft: MAX_JUMPS, coyote: 0, buffer: 0,
+    dashTimer: 0, dashCooldown: 0, dashDir: 1,
   });
-  const keysRef = useRef<Keys>({ left: false, right: false, jumpJustPressed: false });
+  const keysRef = useRef<Keys>({ left: false, right: false, jumpJustPressed: false, dashJustPressed: false });
   const camXRef = useRef(0);
   const winTimerRef = useRef(-1);
+  const pausedRef = useRef(false);
+  const shakeRef = useRef(0);
+  const particlesRef = useRef<Array<{x:number;y:number;vx:number;vy:number;life:number;color:string}>>([]);
   const levelNumRef = useRef(currentLevel);
   const storeRef = useRef({ completeLevel, addDeath, setScreen, startLevel });
   useEffect(() => { storeRef.current = { completeLevel, addDeath, setScreen, startLevel }; });
@@ -266,6 +287,10 @@ export default function Game() {
     p.x = lv.playerStart.x; p.y = lv.playerStart.y;
     p.vx = 0; p.vy = 0; p.onGround = false;
     p.dead = false; p.deathTimer = 0;
+    p.jumpsLeft = MAX_JUMPS; p.coyote = 0; p.buffer = 0;
+    p.dashTimer = 0; p.dashCooldown = 0;
+    particlesRef.current = [];
+    shakeRef.current = 0;
     camXRef.current = 0; winTimerRef.current = -1;
   }
 
@@ -297,6 +322,11 @@ export default function Game() {
       if (e.code === "ArrowRight" || e.code === "KeyD") k.right = true;
       if ((e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") && !e.repeat)
         k.jumpJustPressed = true;
+      if ((e.code === "ShiftLeft" || e.code === "ShiftRight" || e.code === "KeyJ" || e.code === "KeyX") && !e.repeat)
+        k.dashJustPressed = true;
+      if ((e.code === "KeyP" || e.code === "Escape") && !e.repeat && winTimerRef.current < 0) {
+        if (e.code === "KeyP") { pausedRef.current = !pausedRef.current; e.preventDefault(); return; }
+      }
       if (e.code === "KeyF") toggleFS();
       if (e.code === "Escape") storeRef.current.setScreen("levelselect");
       e.preventDefault();
@@ -315,12 +345,34 @@ export default function Game() {
     let animId: number;
     const FDT = 1000 / 60;
 
+    function spawnDeathFx(p: Player, color: string) {
+      shakeRef.current = 260;
+      for (let i = 0; i < 22; i++) {
+        const ang = (Math.PI * 2 * i) / 22 + Math.random() * 0.3;
+        const sp = 1.5 + Math.random() * 2.4;
+        particlesRef.current.push({
+          x: p.x + PLAYER_W / 2, y: p.y + PLAYER_H / 2,
+          vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 1,
+          life: 600, color: Math.random() < 0.4 ? "#ff3322" : color,
+        });
+      }
+    }
+
     function update() {
       const lv = levelRef.current;
       const p = playerRef.current;
       const k = keysRef.current;
       const mob = mobileInput;
       const now = Date.now();
+
+      // Mobile pause edge
+      if (mob.pausePressed) { mob.pausePressed = false; if (winTimerRef.current < 0) pausedRef.current = !pausedRef.current; }
+      if (pausedRef.current) {
+        // consume edges so they don't fire when unpaused
+        k.jumpJustPressed = false; k.dashJustPressed = false;
+        mob.jumpPressed = false; mob.dashPressed = false;
+        return;
+      }
 
       // Win: auto-advance to next level
       if (winTimerRef.current >= 0) {
@@ -340,6 +392,12 @@ export default function Game() {
 
       if (p.dead) {
         p.deathTimer += FDT;
+        // Update death particles
+        for (const pt of particlesRef.current) {
+          pt.vy += 0.25; pt.x += pt.vx; pt.y += pt.vy; pt.life -= FDT;
+        }
+        particlesRef.current = particlesRef.current.filter(pt => pt.life > 0);
+        if (shakeRef.current > 0) shakeRef.current = Math.max(0, shakeRef.current - FDT);
         if (p.deathTimer > 750) {
           storeRef.current.addDeath(levelNumRef.current);
           respawn();
@@ -350,19 +408,68 @@ export default function Game() {
       const goL = k.left || mob.left;
       const goR = k.right || mob.right;
       const jump = k.jumpJustPressed || mob.jumpPressed;
+      const dash = k.dashJustPressed || mob.dashPressed;
       k.jumpJustPressed = false;
+      k.dashJustPressed = false;
       mob.jumpPressed = false;
+      mob.dashPressed = false;
 
-      p.vx = 0;
-      if (goL) { p.vx = -MOVE_SPEED; p.facingRight = false; }
-      if (goR) { p.vx = MOVE_SPEED; p.facingRight = true; }
-      if (goL && goR) p.vx = 0;
+      // Timers
+      if (p.coyote > 0) p.coyote -= FDT;
+      if (p.buffer > 0) p.buffer -= FDT;
+      if (p.dashTimer > 0) p.dashTimer -= FDT;
+      if (p.dashCooldown > 0) p.dashCooldown -= FDT;
 
-      if (jump && p.onGround) { p.vy = JUMP_VY; p.onGround = false; sounds.jump(); }
-      p.vy = Math.min(p.vy + GRAVITY, MAX_FALL);
+      if (jump) p.buffer = BUFFER_MS;
+
+      // Horizontal input (suspended during dash)
+      if (p.dashTimer > 0) {
+        p.vx = DASH_SPEED * p.dashDir;
+        if (goL) p.facingRight = false;
+        if (goR) p.facingRight = true;
+      } else {
+        p.vx = 0;
+        if (goL) { p.vx = -MOVE_SPEED; p.facingRight = false; }
+        if (goR) { p.vx = MOVE_SPEED; p.facingRight = true; }
+        if (goL && goR) p.vx = 0;
+      }
+
+      // Dash trigger
+      if (dash && p.dashCooldown <= 0 && p.dashTimer <= 0) {
+        p.dashTimer = DASH_MS;
+        p.dashCooldown = DASH_COOLDOWN_MS;
+        p.dashDir = goL && !goR ? -1 : goR && !goL ? 1 : (p.facingRight ? 1 : -1);
+        p.vy = 0;
+        sounds.jump();
+      }
+
+      // Jump (with coyote + buffer + double jump)
+      if (p.buffer > 0) {
+        if (p.onGround || p.coyote > 0) {
+          p.vy = JUMP_VY; p.onGround = false; p.coyote = 0; p.buffer = 0;
+          p.jumpsLeft = MAX_JUMPS - 1;
+          sounds.jump();
+        } else if (p.jumpsLeft > 0) {
+          p.vy = JUMP_VY * 0.92; p.jumpsLeft -= 1; p.buffer = 0;
+          sounds.jump();
+          // Double-jump puff
+          for (let i = 0; i < 6; i++) {
+            particlesRef.current.push({
+              x: p.x + PLAYER_W/2, y: p.y + PLAYER_H,
+              vx: (Math.random()-0.5)*1.6, vy: Math.random()*1.2,
+              life: 260, color: "rgba(255,255,255,0.7)",
+            });
+          }
+        }
+      }
+
+      // Gravity (reduced during dash for floaty effect)
+      if (p.dashTimer > 0) p.vy = 0;
+      else p.vy = Math.min(p.vy + GRAVITY, MAX_FALL);
 
       p.x += p.vx;
       p.x = Math.max(0, Math.min(p.x, lv.widthPx - PLAYER_W));
+      const wasOnGround = p.onGround;
       p.onGround = false;
       for (const plat of lv.platforms) resolveX(p, plat);
 
@@ -376,6 +483,14 @@ export default function Game() {
         if (!landed && plat.type === "disappear" && !plat.disappearing) {
           plat.standTimer = Math.max(0, plat.standTimer - FDT * 2);
         }
+      }
+      // Coyote time + reset jumps on landing
+      if (p.onGround) {
+        p.coyote = COYOTE_MS;
+        p.jumpsLeft = MAX_JUMPS;
+      } else if (wasOnGround) {
+        // leaving ground without jumping — keep coyote
+        p.coyote = COYOTE_MS;
       }
 
       // Update platforms
@@ -404,18 +519,18 @@ export default function Game() {
         if (tr.x >= tr.patrolRight) { tr.x = tr.patrolRight; tr.vx = -Math.abs(tr.vx); }
         // Troll kills player
         if (!p.dead && rectOverlap(p.x + 2, p.y + 2, PLAYER_W - 4, PLAYER_H - 4, tr.x, tr.y, TROLL_W, TROLL_H)) {
-          sounds.troll(); p.dead = true; p.deathTimer = 0;
+          sounds.troll(); p.dead = true; p.deathTimer = 0; spawnDeathFx(p, lv.accentColor);
         }
       }
 
       // Fallen off
-      if (p.y > LEVEL_H + TILE * 2) { sounds.die(); p.dead = true; p.deathTimer = 0; return; }
+      if (p.y > LEVEL_H + TILE * 2) { sounds.die(); p.dead = true; p.deathTimer = 0; spawnDeathFx(p, lv.accentColor); return; }
 
       // Spike death
       for (const sp of lv.spikes) {
         if (!sp.active) continue;
         if (rectOverlap(p.x + 3, p.y + 3, PLAYER_W - 6, PLAYER_H - 5, sp.x, sp.y, sp.w, sp.h)) {
-          sounds.spike(); p.dead = true; p.deathTimer = 0; return;
+          sounds.spike(); p.dead = true; p.deathTimer = 0; spawnDeathFx(p, lv.accentColor); return;
         }
       }
 
@@ -437,7 +552,10 @@ export default function Game() {
 
       ctx.imageSmoothingEnabled = false;
       ctx.save();
-      ctx.translate(-Math.round(camX), 0);
+      const sh = shakeRef.current;
+      const sx = sh > 0 ? (Math.random() - 0.5) * (sh / 60) : 0;
+      const sy = sh > 0 ? (Math.random() - 0.5) * (sh / 60) : 0;
+      ctx.translate(-Math.round(camX) + sx, sy);
 
       drawBg(ctx, lv.bgColor, camX);
       px(ctx, Math.round(camX), LEVEL_H, BASE_W, BASE_H, "rgba(0,0,0,0.75)");
@@ -446,7 +564,24 @@ export default function Game() {
       drawDoor(ctx, lv.door, winTimerRef.current >= 0);
       for (const sp of lv.spikes) drawSpike(ctx, sp);
       for (const tr of lv.trolls) drawTroll(ctx, tr, now);
-      drawPlayer(ctx, p, lv.accentColor);
+      if (!p.dead) {
+        // Dash trail
+        if (p.dashTimer > 0) {
+          for (let i = 1; i <= 3; i++) {
+            ctx.globalAlpha = 0.18 * i;
+            px(ctx, p.x - p.dashDir * i * 4, p.y, PLAYER_W, PLAYER_H, lv.accentColor);
+          }
+          ctx.globalAlpha = 1;
+        }
+        drawPlayer(ctx, p, lv.accentColor);
+      }
+      // Particles
+      for (const pt of particlesRef.current) {
+        const a = Math.max(0, Math.min(1, pt.life / 500));
+        ctx.globalAlpha = a;
+        px(ctx, pt.x, pt.y, 2, 2, pt.color);
+      }
+      ctx.globalAlpha = 1;
 
       // Win overlay
       if (winTimerRef.current >= 0) {
@@ -475,7 +610,12 @@ export default function Game() {
       ctx.textAlign = "left";
       ctx.fillText("ESC=EXIT", 3, 6.5);
       ctx.textAlign = "right";
-      ctx.fillText("F=FULL", BASE_W - 3, 6.5);
+      ctx.fillText("P=PAUSE F=FULL", BASE_W - 3, 6.5);
+
+      // Dash cooldown indicator (bottom-left, in-canvas HUD)
+      const cdPct = 1 - Math.max(0, Math.min(1, p.dashCooldown / DASH_COOLDOWN_MS));
+      px(ctx, 4, BASE_H - 8, 30, 3, "rgba(255,255,255,0.12)");
+      px(ctx, 4, BASE_H - 8, 30 * cdPct, 3, cdPct >= 1 ? "#7cdcff" : "#3a6a88");
 
       // Win banner
       if (winTimerRef.current >= 0) {
@@ -492,6 +632,19 @@ export default function Game() {
         const pct = Math.min(1, winTimerRef.current / 1000);
         px(ctx, BASE_W / 2 - 60, BASE_H / 2 + 14, 120, 3, "rgba(255,255,255,0.1)");
         px(ctx, BASE_W / 2 - 60, BASE_H / 2 + 14, 120 * pct, 3, "#ffee22");
+      }
+
+      // Pause overlay
+      if (pausedRef.current) {
+        ctx.fillStyle = "rgba(0,0,0,0.7)";
+        ctx.fillRect(0, 0, BASE_W, BASE_H);
+        ctx.fillStyle = "#ffee22";
+        ctx.textAlign = "center";
+        ctx.font = "bold 12px 'Courier New', monospace";
+        ctx.fillText("PAUSED", BASE_W / 2, BASE_H / 2 - 8);
+        ctx.fillStyle = "rgba(255,255,255,0.7)";
+        ctx.font = "bold 7px 'Courier New', monospace";
+        ctx.fillText("P = RESUME   ESC = EXIT", BASE_W / 2, BASE_H / 2 + 6);
       }
     }
 

@@ -6,9 +6,14 @@ export interface MobileInput {
   right: boolean;
   jump: boolean;
   jumpPressed: boolean;
+  dashPressed: boolean;
+  pausePressed: boolean;
 }
 
-export const mobileInput: MobileInput = { left: false, right: false, jump: false, jumpPressed: false };
+export const mobileInput: MobileInput = {
+  left: false, right: false, jump: false, jumpPressed: false,
+  dashPressed: false, pausePressed: false,
+};
 
 function Btn({
   label,
@@ -63,6 +68,19 @@ export default function MobileControls() {
   if (!isMobile || !showOn) return null;
 
   return (
+    <>
+      <button
+        onTouchStart={(e) => { e.preventDefault(); mobileInput.pausePressed = true; }}
+        onMouseDown={() => { mobileInput.pausePressed = true; }}
+        style={{
+          position: "fixed", top: 10, right: 10, zIndex: 40,
+          width: 44, height: 44, borderRadius: 10,
+          background: "rgba(0,0,0,0.55)", border: "2px solid rgba(255,255,255,0.4)",
+          color: "#fff", fontSize: 20, fontWeight: "bold",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          userSelect: "none", touchAction: "none", cursor: "pointer",
+        }}
+      >❚❚</button>
     <div
       style={{
         position: "fixed",
@@ -91,7 +109,18 @@ export default function MobileControls() {
       </div>
 
       {/* Jump */}
-      <div style={{ pointerEvents: "auto" }}>
+      <div style={{ pointerEvents: "auto", display: "flex", gap: 10, alignItems: "flex-end" }}>
+        <Btn
+          label="⚡"
+          onDown={() => { mobileInput.dashPressed = true; }}
+          onUp={() => {}}
+          style={{
+            width: 64,
+            height: 64,
+            background: "rgba(80,180,255,0.25)",
+            border: "3px solid rgba(120,210,255,0.6)",
+          }}
+        />
         <Btn
           label="↑"
           onDown={() => { mobileInput.jump = true; mobileInput.jumpPressed = true; }}
@@ -105,5 +134,6 @@ export default function MobileControls() {
         />
       </div>
     </div>
+    </>
   );
 }
