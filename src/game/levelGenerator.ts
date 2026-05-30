@@ -111,7 +111,15 @@ function getParams(n: number) {
 }
 
 export function generateLevel(levelNum: number): LevelData {
-  const seed = levelNum * 2654435761 + 987654321;
+  // AI validator may have stored a seed offset for an "impossible" level.
+  // See src/game/levelValidator.ts — overrides live in localStorage as
+  // `mmm:seed:<levelNum>` -> integer offset added to the base seed.
+  let _offset = 0;
+  if (typeof localStorage !== "undefined") {
+    const raw = localStorage.getItem(`mmm:seed:${levelNum}`);
+    if (raw) _offset = Number(raw) || 0;
+  }
+  const seed = levelNum * 2654435761 + 987654321 + _offset * 1013904223;
   const rng = new SeededRandom(seed);
   const p = getParams(levelNum);
   const theme = THEMES[(levelNum - 1) % THEMES.length];
