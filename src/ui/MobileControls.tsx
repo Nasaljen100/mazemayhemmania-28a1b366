@@ -18,6 +18,14 @@ export const mobileInput: MobileInput = {
   restartPressed: false, fullscreenPressed: false,
 };
 
+const topBtn: React.CSSProperties = {
+  width: 44, height: 44, borderRadius: 10,
+  background: "rgba(0,0,0,0.55)", border: "2px solid rgba(255,255,255,0.4)",
+  color: "#fff", fontSize: 18, fontWeight: "bold",
+  display: "flex", alignItems: "center", justifyContent: "center",
+  userSelect: "none", touchAction: "none", cursor: "pointer",
+};
+
 function Btn({
   label,
   onDown,
