@@ -83,6 +83,28 @@ function drawBg(ctx: CanvasRenderingContext2D, bg: string, camX: number) {
     const dx = ((sx - Math.round(camX * 0.25)) % BASE_W + BASE_W) % BASE_W;
     ctx.fillRect(dx, sy, 1, 1);
   }
+  // Parallax pixel clouds (cosmetic only)
+  ctx.fillStyle = "rgba(255,255,255,0.18)";
+  for (let i = 0; i < 8; i++) {
+    const baseX = ((i * 211 + 47) % (BASE_W * 2));
+    const cy = 12 + ((i * 53) % 60);
+    const cx = ((baseX - Math.round(camX * 0.4)) % (BASE_W + 60) + (BASE_W + 60)) % (BASE_W + 60) - 30;
+    ctx.fillRect(cx, cy, 14, 3);
+    ctx.fillRect(cx + 3, cy - 2, 10, 2);
+    ctx.fillRect(cx + 1, cy + 3, 12, 2);
+  }
+  // Distant pixel mountains
+  ctx.fillStyle = "rgba(0,0,0,0.18)";
+  for (let i = 0; i < 12; i++) {
+    const baseX = i * 60 - Math.round(camX * 0.15) % 60;
+    const h = 24 + (i % 3) * 8;
+    ctx.beginPath();
+    ctx.moveTo(baseX, LEVEL_H - 4);
+    ctx.lineTo(baseX + 30, LEVEL_H - 4 - h);
+    ctx.lineTo(baseX + 60, LEVEL_H - 4);
+    ctx.closePath();
+    ctx.fill();
+  }
   ctx.fillStyle = "rgba(255,255,255,0.025)";
   for (let gy = TILE; gy < BASE_H; gy += TILE) ctx.fillRect(0, gy, BASE_W, 1);
 }
