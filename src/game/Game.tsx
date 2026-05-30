@@ -267,10 +267,15 @@ export default function Game() {
     x: 0, y: 0, vx: 0, vy: 0,
     onGround: false, dead: false, deathTimer: 0,
     facingRight: true, walkTimer: 0,
+    jumpsLeft: MAX_JUMPS, coyote: 0, buffer: 0,
+    dashTimer: 0, dashCooldown: 0, dashDir: 1,
   });
-  const keysRef = useRef<Keys>({ left: false, right: false, jumpJustPressed: false });
+  const keysRef = useRef<Keys>({ left: false, right: false, jumpJustPressed: false, dashJustPressed: false });
   const camXRef = useRef(0);
   const winTimerRef = useRef(-1);
+  const pausedRef = useRef(false);
+  const shakeRef = useRef(0);
+  const particlesRef = useRef<Array<{x:number;y:number;vx:number;vy:number;life:number;color:string}>>([]);
   const levelNumRef = useRef(currentLevel);
   const storeRef = useRef({ completeLevel, addDeath, setScreen, startLevel });
   useEffect(() => { storeRef.current = { completeLevel, addDeath, setScreen, startLevel }; });
@@ -282,6 +287,10 @@ export default function Game() {
     p.x = lv.playerStart.x; p.y = lv.playerStart.y;
     p.vx = 0; p.vy = 0; p.onGround = false;
     p.dead = false; p.deathTimer = 0;
+    p.jumpsLeft = MAX_JUMPS; p.coyote = 0; p.buffer = 0;
+    p.dashTimer = 0; p.dashCooldown = 0;
+    particlesRef.current = [];
+    shakeRef.current = 0;
     camXRef.current = 0; winTimerRef.current = -1;
   }
 
