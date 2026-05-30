@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useGameStore } from "../store/gameStore";
+import { useAccountStore } from "../store/accountStore";
 
 const TOTAL = 628;
+const SKIP_COST = 75;
 const PER_PAGE = 100;
 const COLS = 10;
 
@@ -16,7 +18,36 @@ export default function LevelSelect() {
   const maxUnlocked = useGameStore((s) => s.maxUnlocked);
   const completedLevels = useGameStore((s) => s.completedLevels);
   const deathsPerLevel = useGameStore((s) => s.deathsPerLevel);
+  const user = useAccountStore((s) => s.user);
+  const spendXpToSkip = useAccountStore((s) => s.spendXpToSkip);
   const [page, setPage] = useState(0);
+  const [search, setSearch] = useState("");
+
+  function go(n: number) {
+    if (n < 1 || n > TOTAL) return;
+    if (n > maxUnlocked) return;
+    startLevel(n);
+  }
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    const n = parseInt(search, 10);
+    if (!isNaN(n)) {
+      if (n > maxUnlocked) {
+        alert(`Level ${n} is locked. Reach it first or use Skip.`);
+        return;
+      }
+      go(n);
+    }
+  }
+  function handleSkip() {
+    const nextLocked = maxUnlocked;
+    if (nextLocked >= TOTAL) return;
+    if (!user) { alert("Log in to spend XP on level skips."); return; }
+    if (user.xp < SKIP_COST) { alert(`Need ${SKIP_COST} XP (you have ${user.xp}).`); return; }
+    if (!confirm(`Skip level ${nextLocked} for ${SKIP_COST} XP?`)) return;
+    const ok = spendXpToSkip(nextLocked + 1, SKIP_COST);
+    if (!ok) alert("Could not skip.");
+  }
 
   const totalPages = Math.ceil(TOTAL / PER_PAGE);
   const start = page * PER_PAGE + 1;
@@ -51,6 +82,40 @@ export default function LevelSelect() {
           </div>
         </div>
         <button onClick={toggleFullscreen} style={btnStyle}>⛶</button>
+      </div>
+
+      {/* Search + Skip bar */}
+      <div style={{
+        display: "flex", gap: 8, padding: "8px 12px", alignItems: "center",
+        background: "rgba(0,0,0,0.5)", flexWrap: "wrap",
+      }}>
+        <form onSubmit={handleSearch} style={{ display: "flex", gap: 6, flex: 1, minWidth: 200 }}>
+          <input
+            type="number" min={1} max={TOTAL} value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="🔍 Jump to level…"
+            style={{
+              flex: 1, padding: "7px 10px", border: "2px solid rgba(255,255,255,0.15)",
+              background: "rgba(255,255,255,0.06)", color: "white",
+              fontFamily: "inherit", fontSize: 12, borderRadius: 0, minWidth: 0,
+            }}
+          />
+          <button type="submit" style={btnStyle}>GO</button>
+        </form>
+        <button
+          onClick={handleSkip}
+          disabled={!user || user.xp < SKIP_COST || maxUnlocked >= TOTAL}
+          style={{
+            ...btnStyle,
+            background: user && user.xp >= SKIP_COST ? "rgba(180,140,40,0.3)" : "rgba(255,255,255,0.04)",
+            border: "2px solid " + (user && user.xp >= SKIP_COST ? "#ffaa22" : "rgba(255,255,255,0.1)"),
+            color: user && user.xp >= SKIP_COST ? "#ffee22" : "rgba(255,255,255,0.35)",
+            cursor: user && user.xp >= SKIP_COST ? "pointer" : "not-allowed",
+          }}
+          title={user ? `Skip lvl ${maxUnlocked} for ${SKIP_COST} XP (you have ${user.xp})` : "Log in to spend XP"}
+        >
+          ⏭ SKIP −{SKIP_COST} XP
+        </button>
       </div>
 
       {/* Page tabs */}
