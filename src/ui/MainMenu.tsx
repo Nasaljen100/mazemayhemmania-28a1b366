@@ -93,6 +93,13 @@ export default function MainMenu() {
 
       {/* Version badge (top-left) */}
       <div style={{ position: "absolute", top: 56, left: 16, zIndex: 10 }}>
+        <button onClick={() => setMusicOn((v) => !v)} style={{
+          background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)",
+          color: musicOn ? "#22ccff" : "rgba(255,255,255,0.3)", fontSize: 14, padding: "4px 8px",
+          cursor: "pointer", fontFamily: "inherit", marginRight: 6,
+        }} title={musicOn ? "Mute music" : "Play music"}>
+          {musicOn ? "🔊" : "🔇"}
+        </button>
         <button onClick={() => setShowVersion(!showVersion)} style={{
           background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)",
           color: "rgba(255,255,255,0.4)", fontSize: 10, padding: "4px 8px",
