@@ -70,8 +70,8 @@ export default function FriendsScreen({ onBack }: { onBack: () => void }) {
     sounds.menuClick();
     await sendFriendRequest(friendId);
     setMsg(`Request sent to ${username}!`);
-    setResults(prev => prev.filter(u => u.id !== friendId));
-    setSuggested(prev => prev.filter(u => u.id !== friendId));
+    setResults(prev => prev.filter(u => String(u.id) !== String(friendId)));
+    setSuggested(prev => prev.filter(u => String(u.id) !== String(friendId)));
     setTimeout(() => setMsg(""), 3000);
   };
 
@@ -232,7 +232,7 @@ export default function FriendsScreen({ onBack }: { onBack: () => void }) {
                     <div style={{ fontSize: 13 }}>{u.username} <span style={{ color: "#666", fontSize: 10 }}>#{u.id}</span></div>
                     <div style={{ fontSize: 10, color: "#888" }}>LVL {u.xpLevel} · {u.xp.toLocaleString()} XP</div>
                   </div>
-                  <button onClick={() => sendReq(u.id, u.username)} style={actionBtn("#1a4466", "#1a6699")}>+ ADD</button>
+                  <button onClick={() => sendReq(u.id as any, u.username)} style={actionBtn("#1a4466", "#1a6699")}>+ ADD</button>
                 </div>
               ))}
 

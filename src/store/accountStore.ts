@@ -1,14 +1,15 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-
-import { API_BASE as BASE, wsUrl } from "../lib/gameApi";
+import { supabase } from "../integrations/supabase/client";
 
 export interface AccountUser {
-  id: number;
+  id: string;
   username: string;
   avatarUrl: string | null;
   xp: number;
   xpLevel: number;
+  isModerator: boolean;
+  isAdmin: boolean;
 }
 
 export interface AccountProgress {
@@ -68,29 +69,39 @@ export interface AccountStore {
   stopHeartbeat: () => void;
 }
 
-let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
-
-async function api(path: string, method = "GET", body?: unknown, token?: string) {
-  const r = await fetch(`${BASE}${path}`, {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { "x-session-token": token } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const data = await r.json();
-  if (!r.ok) throw new Error(data.error ?? "Request failed");
-  return data;
+function emailFor(username: string) {
+  return `${username.toLowerCase().replace(/[^a-z0-9_]/g, "")}@mmm.local`;
 }
 
-async function beat(token: string) {
-  try {
-    await fetch(`${BASE}/online/heartbeat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-session-token": token },
-    });
-  } catch {}
+function xpLevelOf(xp: number) {
+  return Math.max(1, Math.floor(Math.sqrt(xp / 50)) + 1);
+}
+
+async function hydrate(userId: string) {
+  const [{ data: prof }, { data: roles }, { data: prog }] = await Promise.all([
+    supabase.from("profiles").select("username, avatar_url, xp").eq("id", userId).maybeSingle(),
+    supabase.from("user_roles").select("role").eq("user_id", userId),
+    supabase.from("game_progress").select("*").eq("user_id", userId).maybeSingle(),
+  ]);
+  const xp = prof?.xp ?? 0;
+  const user: AccountUser = {
+    id: userId,
+    username: prof?.username ?? "player",
+    avatarUrl: prof?.avatar_url ?? null,
+    xp,
+    xpLevel: xpLevelOf(xp),
+    isModerator: !!roles?.some((r: any) => r.role === "moderator"),
+    isAdmin: !!roles?.some((r: any) => r.role === "admin"),
+  };
+  const progress: AccountProgress | null = prog
+    ? {
+        maxUnlocked: prog.max_unlocked ?? 1,
+        completedLevels: (prog.completed_levels as number[]) ?? [],
+        deathsPerLevel: (prog.deaths_per_level as Record<string, number>) ?? {},
+        totalDeaths: prog.total_deaths ?? 0,
+      }
+    : null;
+  return { user, progress };
 }
 
 export const useAccountStore = create<AccountStore>()(
@@ -109,27 +120,19 @@ export const useAccountStore = create<AccountStore>()(
       setError: (error) => set({ error }),
       dismissXpBanner: () => set({ xpBanner: null }),
 
-      startHeartbeat: (token: string) => {
-        if (heartbeatInterval) clearInterval(heartbeatInterval);
-        beat(token);
-        heartbeatInterval = setInterval(() => beat(token), 30000);
-      },
-
-      stopHeartbeat: () => {
-        if (heartbeatInterval) { clearInterval(heartbeatInterval); heartbeatInterval = null; }
-      },
+      startHeartbeat: () => {},
+      stopHeartbeat: () => {},
 
       login: async (username, password) => {
         set({ loading: true, error: null });
         try {
-          const data = await api("/auth/login", "POST", { username, password });
-          const progress: AccountProgress | null = data.progress ? {
-            maxUnlocked: data.progress.max_unlocked ?? data.progress.maxUnlocked ?? 1,
-            completedLevels: data.progress.completed_levels ?? data.progress.completedLevels ?? [],
-            deathsPerLevel: data.progress.deaths_per_level ?? data.progress.deathsPerLevel ?? {},
-            totalDeaths: data.progress.total_deaths ?? data.progress.totalDeaths ?? 0,
-          } : null;
-          set({ user: data.user, token: data.token, progress, loading: false });
+          const { data, error } = await supabase.auth.signInWithPassword({
+            email: emailFor(username),
+            password,
+          });
+          if (error || !data.user) throw new Error(error?.message ?? "Login failed");
+          const { user, progress } = await hydrate(data.user.id);
+          set({ user, token: data.session?.access_token ?? null, progress, loading: false });
           if (progress) {
             const { useGameStore } = await import("./gameStore");
             useGameStore.getState().loadProgress(progress);
@@ -144,8 +147,24 @@ export const useAccountStore = create<AccountStore>()(
       register: async (username, password) => {
         set({ loading: true, error: null });
         try {
-          const data = await api("/auth/register", "POST", { username, password });
-          set({ user: data.user, token: data.token, progress: null, loading: false });
+          const uname = username.trim();
+          if (!/^[a-zA-Z0-9_]{3,20}$/.test(uname)) {
+            throw new Error("Username must be 3-20 chars (letters/numbers/_)");
+          }
+          // Check username uniqueness (case-insensitive) up-front for a clean error.
+          const { data: existing } = await supabase
+            .from("profiles").select("id").ilike("username", uname).maybeSingle();
+          if (existing) throw new Error("Username already taken");
+          const { data, error } = await supabase.auth.signUp({
+            email: emailFor(uname),
+            password,
+            options: { data: { username: uname } },
+          });
+          if (error || !data.user) throw new Error(error?.message ?? "Signup failed");
+          // Wait briefly for handle_new_user trigger to materialize profile + role.
+          await new Promise((r) => setTimeout(r, 400));
+          const { user, progress } = await hydrate(data.user.id);
+          set({ user, token: data.session?.access_token ?? null, progress, loading: false });
           return true;
         } catch (e) {
           set({ loading: false, error: (e as Error).message });
@@ -154,131 +173,99 @@ export const useAccountStore = create<AccountStore>()(
       },
 
       logout: async () => {
-        const { token } = get();
-        get().stopHeartbeat();
-        if (token) await api("/auth/logout", "POST", {}, token).catch(() => {});
+        await supabase.auth.signOut().catch(() => {});
         set({ user: null, token: null, progress: null, quests: [], friends: [] });
       },
 
       restoreSession: async () => {
-        const { token } = get();
-        if (!token) return;
-        try {
-          const data = await api("/auth/me", "GET", undefined, token);
-          const progress: AccountProgress | null = data.progress ? {
-            maxUnlocked: data.progress.maxUnlocked ?? data.progress.max_unlocked ?? 1,
-            completedLevels: data.progress.completedLevels ?? data.progress.completed_levels ?? [],
-            deathsPerLevel: data.progress.deathsPerLevel ?? data.progress.deaths_per_level ?? {},
-            totalDeaths: data.progress.totalDeaths ?? data.progress.total_deaths ?? 0,
-          } : null;
-          set({ user: data.user, progress });
-          if (progress) {
-            const { useGameStore } = await import("./gameStore");
-            useGameStore.getState().loadProgress(progress);
-          }
-        } catch {
-          set({ token: null, user: null, progress: null });
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) { set({ user: null, token: null, progress: null }); return; }
+        const { user, progress } = await hydrate(session.user.id);
+        set({ user, token: session.access_token, progress });
+        if (progress) {
+          const { useGameStore } = await import("./gameStore");
+          useGameStore.getState().loadProgress(progress);
         }
       },
 
       saveProgress: async (p) => {
-        const { token } = get();
-        if (!token) return;
-        try {
-          const data = await api("/progress/save", "POST", {
-            maxUnlocked: p.maxUnlocked,
-            completedLevels: p.completedLevels,
-            deathsPerLevel: p.deathsPerLevel,
-            totalDeaths: p.totalDeaths,
-          }, token);
-          set({ progress: p });
-          if (data.xpGained > 0) {
-            set({
-              user: get().user ? { ...get().user!, xp: data.newXp, xpLevel: data.newXpLevel } : null,
-              xpBanner: { amount: data.xpGained, quests: data.newlyCompleted ?? [] },
-            });
-          }
-        } catch {}
+        const { user } = get();
+        if (!user) return;
+        const prevXp = get().progress?.totalDeaths != null ? (user.xp ?? 0) : 0;
+        // XP formula: 10 per cleared level, +1 per attempt survived.
+        const newXp = p.completedLevels.length * 10;
+        const xpGained = Math.max(0, newXp - (user.xp ?? 0));
+        await supabase.from("game_progress").upsert({
+          user_id: user.id,
+          max_unlocked: p.maxUnlocked,
+          completed_levels: p.completedLevels as any,
+          deaths_per_level: p.deathsPerLevel as any,
+          total_deaths: p.totalDeaths,
+          updated_at: new Date().toISOString(),
+        });
+        if (xpGained > 0) {
+          await supabase.from("profiles").update({ xp: newXp }).eq("id", user.id);
+        }
+        set({
+          progress: p,
+          user: { ...user, xp: newXp, xpLevel: xpLevelOf(newXp) },
+          ...(xpGained > 0 ? { xpBanner: { amount: xpGained, quests: [] } } : {}),
+        });
+        void prevXp;
       },
 
       uploadAvatar: async (dataUrl) => {
-        const { token } = get();
-        if (!token) return;
-        await api("/auth/avatar", "POST", { avatarUrl: dataUrl }, token);
-        set({ user: get().user ? { ...get().user!, avatarUrl: dataUrl } : null });
-      },
-
-      fetchQuests: async () => {
-        const { token } = get();
-        if (!token) return;
+        const { user } = get();
+        if (!user) return;
         try {
-          const data = await api("/quests", "GET", undefined, token);
-          set({ quests: data.quests });
-        } catch {}
-      },
-
-      fetchFriends: async () => {
-        const { token } = get();
-        if (!token) return;
-        try {
-          const data = await api("/friends", "GET", undefined, token);
-          set({ friends: data.friends ?? [], incomingRequests: data.incoming ?? [] });
-        } catch {}
-      },
-
-      sendFriendRequest: async (friendId) => {
-        const { token } = get();
-        if (!token) return;
-        await api("/friends/request", "POST", { friendId }, token);
-      },
-
-      acceptFriend: async (friendId) => {
-        const { token } = get();
-        if (!token) return;
-        await api("/friends/accept", "POST", { friendId }, token);
-        await get().fetchFriends();
-      },
-
-      searchUser: async (q) => {
-        const { token } = get();
-        if (!token) return [];
-        try {
-          const data = await api(`/users/search?q=${encodeURIComponent(q)}`, "GET", undefined, token);
-          return data.users ?? [];
-        } catch {
-          return [];
+          // Convert data URL to blob
+          const resp = await fetch(dataUrl);
+          const blob = await resp.blob();
+          const ext = (blob.type.split("/")[1] || "png").split("+")[0];
+          const path = `${user.id}/avatar-${Date.now()}.${ext}`;
+          const { error: upErr } = await supabase.storage.from("avatars").upload(path, blob, { upsert: true });
+          if (upErr) throw upErr;
+          const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
+          await supabase.from("profiles").update({ avatar_url: pub.publicUrl }).eq("id", user.id);
+          set({ user: { ...user, avatarUrl: pub.publicUrl } });
+        } catch (e) {
+          console.error("avatar upload failed", e);
         }
       },
+
+      // Friends/quests are stubbed pending re-implementation on Cloud.
+      fetchQuests: async () => {},
+      fetchFriends: async () => {},
+      sendFriendRequest: async () => {},
+      acceptFriend: async () => {},
+      searchUser: async () => [],
 
       spendXpToSkip: (level, cost) => {
         const { user } = get();
         if (!user) return false;
         if (user.xp < cost) return false;
-        // Deduct XP locally
-        set({ user: { ...user, xp: user.xp - cost } });
-        // Unlock the level and mark prior level cleared
+        const newXp = user.xp - cost;
+        set({ user: { ...user, xp: newXp, xpLevel: xpLevelOf(newXp) } });
+        supabase.from("profiles").update({ xp: newXp }).eq("id", user.id).then(() => {});
         import("./gameStore").then(({ useGameStore }) => {
           const gs = useGameStore.getState();
           const newCompleted = new Set(gs.completedLevels);
           newCompleted.add(level - 1);
           const newMax = Math.max(gs.maxUnlocked, level);
           useGameStore.setState({ completedLevels: newCompleted, maxUnlocked: newMax });
-          const { token } = get();
-          if (token) {
-            get().saveProgress({
-              maxUnlocked: newMax,
-              completedLevels: Array.from(newCompleted),
-              deathsPerLevel: Object.fromEntries(Object.entries(gs.deathsPerLevel).map(([k, v]) => [k, v])),
-              totalDeaths: gs.totalDeaths,
-            });
-          }
+          get().saveProgress({
+            maxUnlocked: newMax,
+            completedLevels: Array.from(newCompleted),
+            deathsPerLevel: Object.fromEntries(Object.entries(gs.deathsPerLevel).map(([k, v]) => [k, v])),
+            totalDeaths: gs.totalDeaths,
+          });
         });
         return true;
       },
     }),
     {
-      name: "level-hinter-account",
-      partialize: (s) => ({ token: s.token }),
+      name: "mmm-account",
+      partialize: () => ({}),
     }
   )
 );
