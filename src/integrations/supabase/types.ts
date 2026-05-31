@@ -14,16 +14,189 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      ai_levels: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          definition: Json
+          id: string
+          level_number: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          definition: Json
+          id?: string
+          level_number: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          definition?: Json
+          id?: string
+          level_number?: number
+        }
+        Relationships: []
+      }
+      broadcasts: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          payload: Json
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          payload?: Json
+          type: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          payload?: Json
+          type?: string
+        }
+        Relationships: []
+      }
+      game_progress: {
+        Row: {
+          completed_levels: Json
+          deaths_per_level: Json
+          max_unlocked: number
+          total_deaths: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed_levels?: Json
+          deaths_per_level?: Json
+          max_unlocked?: number
+          total_deaths?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed_levels?: Json
+          deaths_per_level?: Json
+          max_unlocked?: number
+          total_deaths?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      john_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          image_url: string | null
+          role: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          role: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          role?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      live_config: {
+        Row: {
+          data: Json
+          id: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          data?: Json
+          id?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          data?: Json
+          id?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          id: string
+          updated_at: string
+          username: string
+          xp: number
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          id: string
+          updated_at?: string
+          username: string
+          xp?: number
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          id?: string
+          updated_at?: string
+          username?: string
+          xp?: number
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "user" | "moderator" | "admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +323,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["user", "moderator", "admin"],
+    },
   },
 } as const
