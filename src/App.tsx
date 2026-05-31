@@ -43,6 +43,23 @@ export default function App() {
     startLevelValidator();
   }, []);
 
+  // Autosave progress every 20 seconds when logged in.
+  useEffect(() => {
+    if (!token) return;
+    const iv = setInterval(() => {
+      const gs = useGameStore.getState();
+      useAccountStore.getState().saveProgress({
+        maxUnlocked: gs.maxUnlocked,
+        completedLevels: Array.from(gs.completedLevels),
+        deathsPerLevel: Object.fromEntries(
+          Object.entries(gs.deathsPerLevel).map(([k, v]) => [k, v])
+        ),
+        totalDeaths: gs.totalDeaths,
+      });
+    }, 20000);
+    return () => clearInterval(iv);
+  }, [token]);
+
   useEffect(() => {
     if (token) {
       try { connect(token); } catch { /* ignore */ }
