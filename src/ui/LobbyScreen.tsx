@@ -80,8 +80,8 @@ export default function LobbyScreen({ onStart, onBack }: Props) {
   }
 
   const allPlayers = [
-    ...(user && remotePlayers.every(p => p.userId !== user.id) ? [{
-      userId: user.id,
+    ...(user && remotePlayers.every(p => String(p.userId) !== String(user.id)) ? [{
+      userId: user.id as any,
       username: user.username,
       colorIndex: myColorIndex,
       x: 0, y: 0, facingRight: true, onGround: false, dead: false, level: currentLevel,
