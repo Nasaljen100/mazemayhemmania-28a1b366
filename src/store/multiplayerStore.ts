@@ -1,8 +1,9 @@
 import { create } from "zustand";
-import { PLAYER_COLORS } from "../game/gameConfig";
+import { supabase } from "../integrations/supabase/client";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 export interface RemotePlayer {
-  userId: number;
+  userId: string;
   username: string;
   colorIndex: number;
   x: number;
@@ -14,8 +15,12 @@ export interface RemotePlayer {
 }
 
 export interface MultiplayerStore {
-  ws: WebSocket | null;
+  ws: null;
+  channel: RealtimeChannel | null;
   lobbyId: string | null;
+  lobbyDbId: string | null;
+  selfUserId: string | null;
+  selfUsername: string | null;
   currentLevel: number;
   myColorIndex: number;
   remotePlayers: RemotePlayer[];
@@ -26,7 +31,7 @@ export interface MultiplayerStore {
   connect: (token: string) => void;
   disconnect: () => void;
   createAndJoinLobby: (token: string) => Promise<string | null>;
-  joinLobby: (lobbyId: string) => void;
+  joinLobby: (lobbyId: string) => Promise<void>;
   leaveLobby: () => void;
   sendPlayerState: (state: { x: number; y: number; facingRight: boolean; onGround: boolean; dead: boolean; level: number }) => void;
   sendLevelAdvance: (nextLevel: number) => void;
@@ -34,11 +39,20 @@ export interface MultiplayerStore {
   setError: (e: string | null) => void;
 }
 
-import { API_BASE as BASE, wsUrl } from "../lib/gameApi";
+function makeCode() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let s = "";
+  for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return s;
+}
 
 export const useMultiplayerStore = create<MultiplayerStore>((set, get) => ({
   ws: null,
+  channel: null,
   lobbyId: null,
+  lobbyDbId: null,
+  selfUserId: null,
+  selfUsername: null,
   currentLevel: 1,
   myColorIndex: 0,
   remotePlayers: [],
@@ -49,129 +63,130 @@ export const useMultiplayerStore = create<MultiplayerStore>((set, get) => ({
   setError: (error) => set({ error }),
   setLevelAdvanceCallback: (cb) => set({ levelAdvanceCallback: cb }),
 
-  connect: (token: string) => {
-    const existing = get().ws;
-    if (existing && existing.readyState === WebSocket.OPEN) return;
-
-    const ws = new WebSocket(wsUrl());
-
-    ws.onopen = () => {
-      set({ connected: true, error: null });
-      ws.send(JSON.stringify({ type: "auth", token }));
-    };
-
-    ws.onmessage = (ev) => {
-      let msg: Record<string, unknown>;
-      try { msg = JSON.parse(ev.data); } catch { return; }
-
-      const type = msg.type as string;
-
-      if (type === "authed") {
-        set({ connected: true });
-      }
-      else if (type === "joined") {
-        set({
-          lobbyId: msg.lobbyId as string,
-          currentLevel: (msg.currentLevel as number) ?? 1,
-          myColorIndex: (msg.colorIndex as number) ?? 0,
-          remotePlayers: [],
-        });
-      }
-      else if (type === "left") {
-        set({ lobbyId: null, remotePlayers: [], currentLevel: 1 });
-      }
-      else if (type === "lobby_state") {
-        const players = (msg.players as RemotePlayer[]) ?? [];
-        const { ws: currentWs } = get();
-        // Filter out self (we identify by colorIndex set at join)
-        set({ remotePlayers: players });
-      }
-      else if (type === "player_state") {
-        const update = msg as unknown as RemotePlayer;
-        set(s => ({
-          remotePlayers: s.remotePlayers.some(p => p.userId === update.userId)
-            ? s.remotePlayers.map(p => p.userId === update.userId ? { ...p, ...update } : p)
-            : [...s.remotePlayers, update],
-        }));
-      }
-      else if (type === "player_joined") {
-        // Will get a lobby_state broadcast
-      }
-      else if (type === "player_left") {
-        const userId = msg.userId as number;
-        set(s => ({ remotePlayers: s.remotePlayers.filter(p => p.userId !== userId) }));
-      }
-      else if (type === "level_advance") {
-        const nextLevel = msg.nextLevel as number;
-        set({ currentLevel: nextLevel });
-        const cb = get().levelAdvanceCallback;
-        if (cb) cb(nextLevel);
-      }
-      else if (type === "error") {
-        set({ error: msg.message as string });
-      }
-    };
-
-    ws.onclose = () => {
-      set({ connected: false, ws: null, lobbyId: null, remotePlayers: [] });
-    };
-
-    ws.onerror = () => {
-      set({ error: "Connection failed", connected: false });
-    };
-
-    set({ ws });
-  },
+  connect: () => { set({ connected: true, error: null }); },
 
   disconnect: () => {
-    const { ws } = get();
-    if (ws) ws.close();
-    set({ ws: null, connected: false, lobbyId: null, remotePlayers: [], currentLevel: 1 });
+    const { channel } = get();
+    if (channel) supabase.removeChannel(channel);
+    set({ channel: null, connected: false, lobbyId: null, lobbyDbId: null, remotePlayers: [], currentLevel: 1 });
   },
 
-  createAndJoinLobby: async (token: string) => {
-    try {
-      const r = await fetch(`${BASE}/lobbies/create`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-session-token": token },
-      });
-      const data = await r.json();
-      if (!r.ok) { set({ error: data.error }); return null; }
-      const lobbyId = data.lobbyId as string;
-      get().joinLobby(lobbyId);
-      return lobbyId;
-    } catch {
-      set({ error: "Failed to create lobby" });
-      return null;
-    }
+  createAndJoinLobby: async () => {
+    const { data: u } = await supabase.auth.getUser();
+    const user = u?.user;
+    if (!user) { set({ error: "Not signed in" }); return null; }
+    const code = makeCode();
+    const { data: lobby, error } = await supabase
+      .from("lobbies")
+      .insert({ code, host_id: user.id, current_level: 1 })
+      .select().single();
+    if (error || !lobby) { set({ error: error?.message ?? "Failed to create lobby" }); return null; }
+    await get().joinLobby(code);
+    return code;
   },
 
-  joinLobby: (lobbyId: string) => {
-    const { ws } = get();
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      set({ error: "Not connected" }); return;
-    }
-    ws.send(JSON.stringify({ type: "join_lobby", lobbyId }));
+  joinLobby: async (code: string) => {
+    const { data: u } = await supabase.auth.getUser();
+    const user = u?.user;
+    if (!user) { set({ error: "Not signed in" }); return; }
+    const { data: prof } = await supabase
+      .from("profiles").select("username").eq("id", user.id).maybeSingle();
+    const username = prof?.username ?? "player";
+
+    const { data: lobby, error } = await supabase
+      .from("lobbies").select("*").eq("code", code).maybeSingle();
+    if (error || !lobby) { set({ error: "Lobby not found" }); return; }
+
+    const { data: existing } = await supabase
+      .from("lobby_players").select("color_index").eq("lobby_id", lobby.id);
+    const used = new Set((existing ?? []).map((p: any) => p.color_index));
+    let colorIndex = 0;
+    while (used.has(colorIndex)) colorIndex++;
+
+    await supabase.from("lobby_players").upsert({
+      lobby_id: lobby.id, user_id: user.id, username, color_index: colorIndex,
+    }, { onConflict: "lobby_id,user_id" });
+
+    const prev = get().channel;
+    if (prev) supabase.removeChannel(prev);
+
+    const ch = supabase.channel(`lobby:${lobby.id}`, {
+      config: { broadcast: { self: false } },
+    });
+
+    ch.on("broadcast", { event: "player_state" }, (p: any) => {
+      const update = p.payload as RemotePlayer;
+      if (!update?.userId || update.userId === user.id) return;
+      set(s => ({
+        remotePlayers: s.remotePlayers.some(rp => rp.userId === update.userId)
+          ? s.remotePlayers.map(rp => rp.userId === update.userId ? { ...rp, ...update } : rp)
+          : [...s.remotePlayers, update],
+      }));
+    });
+    ch.on("broadcast", { event: "level_advance" }, (p: any) => {
+      const next = p.payload?.nextLevel as number;
+      if (!next) return;
+      set({ currentLevel: next });
+      const cb = get().levelAdvanceCallback;
+      if (cb) cb(next);
+    });
+    ch.on("broadcast", { event: "player_left" }, (p: any) => {
+      const uid = p.payload?.userId as string;
+      set(s => ({ remotePlayers: s.remotePlayers.filter(rp => rp.userId !== uid) }));
+    });
+
+    await ch.subscribe();
+
+    const { data: peers } = await supabase
+      .from("lobby_players").select("*").eq("lobby_id", lobby.id);
+    const remote: RemotePlayer[] = (peers ?? [])
+      .filter((p: any) => p.user_id !== user.id)
+      .map((p: any) => ({
+        userId: p.user_id, username: p.username, colorIndex: p.color_index,
+        x: 0, y: 0, facingRight: true, onGround: false, dead: false, level: lobby.current_level,
+      }));
+
+    set({
+      channel: ch,
+      lobbyId: code,
+      lobbyDbId: lobby.id,
+      currentLevel: lobby.current_level,
+      myColorIndex: colorIndex,
+      remotePlayers: remote,
+      selfUserId: user.id,
+      selfUsername: username,
+      connected: true,
+      error: null,
+    });
   },
 
   leaveLobby: () => {
-    const { ws } = get();
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "leave_lobby" }));
+    const { channel, lobbyDbId, selfUserId } = get();
+    if (channel && selfUserId) {
+      try { channel.send({ type: "broadcast", event: "player_left", payload: { userId: selfUserId } }); } catch { /* ignore */ }
+      supabase.removeChannel(channel);
     }
-    set({ lobbyId: null, remotePlayers: [], currentLevel: 1 });
+    if (lobbyDbId && selfUserId) {
+      supabase.from("lobby_players").delete()
+        .eq("lobby_id", lobbyDbId).eq("user_id", selfUserId).then(() => {});
+    }
+    set({ channel: null, lobbyId: null, lobbyDbId: null, remotePlayers: [], currentLevel: 1 });
   },
 
   sendPlayerState: (state) => {
-    const { ws, lobbyId } = get();
-    if (!ws || ws.readyState !== WebSocket.OPEN || !lobbyId) return;
-    ws.send(JSON.stringify({ type: "player_state", ...state }));
+    const { channel, selfUserId, selfUsername, myColorIndex } = get();
+    if (!channel || !selfUserId) return;
+    channel.send({
+      type: "broadcast", event: "player_state",
+      payload: { userId: selfUserId, username: selfUsername, colorIndex: myColorIndex, ...state },
+    });
   },
 
   sendLevelAdvance: (nextLevel: number) => {
-    const { ws, lobbyId } = get();
-    if (!ws || ws.readyState !== WebSocket.OPEN || !lobbyId) return;
-    ws.send(JSON.stringify({ type: "level_advance", nextLevel }));
+    const { channel, lobbyDbId } = get();
+    if (!channel) return;
+    channel.send({ type: "broadcast", event: "level_advance", payload: { nextLevel } });
+    if (lobbyDbId) supabase.from("lobbies").update({ current_level: nextLevel }).eq("id", lobbyDbId).then(() => {});
     set({ currentLevel: nextLevel });
   },
 }));

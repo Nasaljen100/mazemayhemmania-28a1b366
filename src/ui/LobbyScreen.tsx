@@ -15,7 +15,6 @@ export default function LobbyScreen({ onStart, onBack }: Props) {
   const friends = useAccountStore(s => s.friends);
   const fetchFriends = useAccountStore(s => s.fetchFriends);
 
-  const ws = useMultiplayerStore(s => s.ws);
   const connected = useMultiplayerStore(s => s.connected);
   const lobbyId = useMultiplayerStore(s => s.lobbyId);
   const currentLevel = useMultiplayerStore(s => s.currentLevel);
@@ -35,9 +34,7 @@ export default function LobbyScreen({ onStart, onBack }: Props) {
 
   useEffect(() => {
     lobbyMusic.start();
-    if (token && (!ws || ws.readyState !== WebSocket.OPEN)) {
-      connect(token);
-    }
+    if (token) connect(token);
     fetchFriends();
     return () => { lobbyMusic.stop(); };
   }, []);

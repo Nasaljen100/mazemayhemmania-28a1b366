@@ -15,6 +15,11 @@ import MultiplayerGame from "./ui/MultiplayerGame";
 import XpBanner from "./ui/XpBanner";
 import Leaderboard from "./ui/Leaderboard";
 import WeeklyChallenges from "./ui/WeeklyChallenges";
+import UpdateOverlay from "./ui/UpdateOverlay";
+import BobBuddy from "./game/BobBuddy";
+import JohnChat from "./ui/JohnChat";
+import { useLiveConfigStore } from "./store/liveConfigStore";
+import { useState } from "react";
 import { startLevelValidator } from "./game/levelValidator";
 import "./game-styles.css";
 
@@ -27,9 +32,13 @@ export default function App() {
   const screen = useGameStore((s) => s.screen) as Screen;
   const setScreen = useGameStore((s) => s.setScreen);
   const restoreSession = useAccountStore((s) => s.restoreSession);
+  const user = useAccountStore((s) => s.user);
   const token = useAccountStore((s) => s.token);
   const startHeartbeat = useAccountStore((s) => s.startHeartbeat);
   const stopHeartbeat = useAccountStore((s) => s.stopHeartbeat);
+  const loadConfig = useLiveConfigStore((s) => s.load);
+  const subscribeConfig = useLiveConfigStore((s) => s.subscribe);
+  const [johnOpen, setJohnOpen] = useState(false);
 
   const lobbyId = useMultiplayerStore((s) => s.lobbyId);
   const lobbyLevel = useMultiplayerStore((s) => s.currentLevel);
@@ -41,6 +50,17 @@ export default function App() {
     restoreSession().catch(() => { /* ignore */ });
     // Kick off the daily AI level validator.
     startLevelValidator();
+    // Load + subscribe to live config (BOB tips, physics overrides).
+    loadConfig();
+    const unsub = subscribeConfig();
+    return () => { unsub(); };
+  }, []);
+
+  // Listen for a custom event from MainMenu to open John (mod-only).
+  useEffect(() => {
+    const h = () => setJohnOpen(true);
+    window.addEventListener("mmm:open-john", h);
+    return () => window.removeEventListener("mmm:open-john", h);
   }, []);
 
   // Autosave progress every 20 seconds when logged in.
@@ -108,6 +128,9 @@ export default function App() {
       {/* Mobile controls also render in multiplayer (handled by MobileControls itself). */}
       {screen === "multiplayer" && <MobileControls />}
       <XpBanner />
+      <BobBuddy />
+      <UpdateOverlay />
+      {johnOpen && user?.isModerator && <JohnChat onClose={() => setJohnOpen(false)} />}
     </div>
   );
 }

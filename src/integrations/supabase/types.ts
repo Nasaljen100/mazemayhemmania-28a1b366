@@ -137,6 +137,62 @@ export type Database = {
         }
         Relationships: []
       }
+      lobbies: {
+        Row: {
+          code: string
+          created_at: string
+          current_level: number
+          host_id: string
+          id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          current_level?: number
+          host_id: string
+          id?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          current_level?: number
+          host_id?: string
+          id?: string
+        }
+        Relationships: []
+      }
+      lobby_players: {
+        Row: {
+          color_index: number
+          joined_at: string
+          lobby_id: string
+          user_id: string
+          username: string
+        }
+        Insert: {
+          color_index?: number
+          joined_at?: string
+          lobby_id: string
+          user_id: string
+          username: string
+        }
+        Update: {
+          color_index?: number
+          joined_at?: string
+          lobby_id?: string
+          user_id?: string
+          username?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lobby_players_lobby_id_fkey"
+            columns: ["lobby_id"]
+            isOneToOne: false
+            referencedRelation: "lobbies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
