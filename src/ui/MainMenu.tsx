@@ -139,7 +139,10 @@ export default function MainMenu() {
                 <img src={user.avatarUrl} style={{ width: 32, height: 32, objectFit: "cover", border: "2px solid rgba(255,220,30,0.5)" }} />
               )}
               <div>
-                <div style={{ fontSize: 12, color: "#ffee22", fontWeight: "bold" }}>{user.username}</div>
+                <div style={{ fontSize: 12, color: "#ffee22", fontWeight: "bold" }}>
+                  {user.isModerator && <span title="Moderator" style={{ marginRight: 4 }}>👑</span>}
+                  {user.username}
+                </div>
                 <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>LVL {xpLevel} · {xp.toLocaleString()} XP</div>
                 <div style={{ fontSize: 9, color: "#888" }}>ID: #{user.id}</div>
               </div>
@@ -227,6 +230,13 @@ export default function MainMenu() {
         )}
 
         <MenuBtn label="⛶  FULLSCREEN" color="#282828" glow="#111" onClick={() => { sounds.menuClick(); toggleFullscreen(); }} />
+        {user?.isModerator && (
+          <MenuBtn
+            label="🛠  JOHN (MOD AI)"
+            color="#075E54" glow="#25D366"
+            onClick={() => { sounds.menuClick(); window.dispatchEvent(new Event("mmm:open-john")); }}
+          />
+        )}
       </div>
 
       {/* Controls hint */}
