@@ -67,6 +67,7 @@ export type Database = {
           completed_levels: Json
           deaths_per_level: Json
           max_unlocked: number
+          skipped_levels: Json
           total_deaths: number
           updated_at: string
           user_id: string
@@ -75,6 +76,7 @@ export type Database = {
           completed_levels?: Json
           deaths_per_level?: Json
           max_unlocked?: number
+          skipped_levels?: Json
           total_deaths?: number
           updated_at?: string
           user_id: string
@@ -83,6 +85,7 @@ export type Database = {
           completed_levels?: Json
           deaths_per_level?: Json
           max_unlocked?: number
+          skipped_levels?: Json
           total_deaths?: number
           updated_at?: string
           user_id?: string

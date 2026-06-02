@@ -1,0 +1,1 @@
+ALTER TABLE public.game_progress ADD COLUMN IF NOT EXISTS skipped_levels jsonb NOT NULL DEFAULT '[]'::jsonb;

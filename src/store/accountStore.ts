@@ -15,6 +15,7 @@ export interface AccountUser {
 export interface AccountProgress {
   maxUnlocked: number;
   completedLevels: number[];
+  skippedLevels: number[];
   deathsPerLevel: Record<string, number>;
   totalDeaths: number;
 }
@@ -67,6 +68,7 @@ export interface AccountStore {
   setError: (e: string | null) => void;
   startHeartbeat: (token: string) => void;
   stopHeartbeat: () => void;
+  fetchGlobalLeaderboard: (limit?: number) => Promise<Array<{ id: string; username: string; avatarUrl: string | null; xp: number; xpLevel: number }>>;
 }
 
 function emailFor(username: string) {
@@ -97,6 +99,7 @@ async function hydrate(userId: string) {
     ? {
         maxUnlocked: prog.max_unlocked ?? 1,
         completedLevels: (prog.completed_levels as number[]) ?? [],
+        skippedLevels: ((prog as any).skipped_levels as number[]) ?? [],
         deathsPerLevel: (prog.deaths_per_level as Record<string, number>) ?? {},
         totalDeaths: prog.total_deaths ?? 0,
       }
@@ -191,18 +194,20 @@ export const useAccountStore = create<AccountStore>()(
       saveProgress: async (p) => {
         const { user } = get();
         if (!user) return;
-        const prevXp = get().progress?.totalDeaths != null ? (user.xp ?? 0) : 0;
-        // XP formula: 10 per cleared level, +1 per attempt survived.
-        const newXp = p.completedLevels.length * 10;
+        // XP formula: 10 per LEGITIMATELY-cleared level (skipped levels do NOT earn XP).
+        const skippedSet = new Set(p.skippedLevels ?? []);
+        const earned = p.completedLevels.filter((l) => !skippedSet.has(l)).length;
+        const newXp = earned * 10;
         const xpGained = Math.max(0, newXp - (user.xp ?? 0));
         await supabase.from("game_progress").upsert({
           user_id: user.id,
           max_unlocked: p.maxUnlocked,
           completed_levels: p.completedLevels as any,
+          skipped_levels: (p.skippedLevels ?? []) as any,
           deaths_per_level: p.deathsPerLevel as any,
           total_deaths: p.totalDeaths,
           updated_at: new Date().toISOString(),
-        });
+        } as any);
         if (xpGained > 0) {
           await supabase.from("profiles").update({ xp: newXp }).eq("id", user.id);
         }
@@ -211,7 +216,6 @@ export const useAccountStore = create<AccountStore>()(
           user: { ...user, xp: newXp, xpLevel: xpLevelOf(newXp) },
           ...(xpGained > 0 ? { xpBanner: { amount: xpGained, quests: [] } } : {}),
         });
-        void prevXp;
       },
 
       uploadAvatar: async (dataUrl) => {
@@ -250,17 +254,33 @@ export const useAccountStore = create<AccountStore>()(
         import("./gameStore").then(({ useGameStore }) => {
           const gs = useGameStore.getState();
           const newCompleted = new Set(gs.completedLevels);
-          newCompleted.add(level - 1);
+          const skippedLevel = level - 1;
+          newCompleted.add(skippedLevel);
+          const newSkipped = new Set(gs.skippedLevels);
+          newSkipped.add(skippedLevel);
           const newMax = Math.max(gs.maxUnlocked, level);
-          useGameStore.setState({ completedLevels: newCompleted, maxUnlocked: newMax });
+          useGameStore.setState({ completedLevels: newCompleted, skippedLevels: newSkipped, maxUnlocked: newMax });
           get().saveProgress({
             maxUnlocked: newMax,
             completedLevels: Array.from(newCompleted),
+            skippedLevels: Array.from(newSkipped),
             deathsPerLevel: Object.fromEntries(Object.entries(gs.deathsPerLevel).map(([k, v]) => [k, v])),
             totalDeaths: gs.totalDeaths,
           });
         });
         return true;
+      },
+
+      fetchGlobalLeaderboard: async (limit = 100) => {
+        const { data } = await supabase
+          .from("profiles")
+          .select("id, username, avatar_url, xp")
+          .order("xp", { ascending: false })
+          .limit(limit);
+        return (data ?? []).map((r: any) => ({
+          id: r.id, username: r.username, avatarUrl: r.avatar_url,
+          xp: r.xp ?? 0, xpLevel: xpLevelOf(r.xp ?? 0),
+        }));
       },
     }),
     {

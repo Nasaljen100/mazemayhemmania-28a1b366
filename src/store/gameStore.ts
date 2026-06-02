@@ -11,6 +11,7 @@ export interface GameStore {
   maxUnlocked: number;
   deathsPerLevel: Record<number, number>;
   completedLevels: Set<number>;
+  skippedLevels: Set<number>;
   totalDeaths: number;
 
   setScreen: (s: AppScreen) => void;
@@ -18,7 +19,7 @@ export interface GameStore {
   completeLevel: () => void;
   addDeath: (level: number) => void;
   resetProgress: () => void;
-  loadProgress: (p: { maxUnlocked: number; completedLevels: number[]; deathsPerLevel: Record<string, number>; totalDeaths: number }) => void;
+  loadProgress: (p: { maxUnlocked: number; completedLevels: number[]; skippedLevels?: number[]; deathsPerLevel: Record<string, number>; totalDeaths: number }) => void;
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -27,6 +28,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   maxUnlocked: 1,
   deathsPerLevel: {},
   completedLevels: new Set(),
+  skippedLevels: new Set(),
   totalDeaths: 0,
 
   setScreen: (screen) => set({ screen }),
@@ -44,10 +46,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
     import("./accountStore").then(({ useAccountStore }) => {
       const { saveProgress, token } = useAccountStore.getState();
       if (!token) return;
-      const { deathsPerLevel, totalDeaths } = get();
+      const { deathsPerLevel, totalDeaths, skippedLevels } = get();
       saveProgress({
         maxUnlocked: newMax,
         completedLevels: Array.from(newCompleted),
+        skippedLevels: Array.from(skippedLevels),
         deathsPerLevel: Object.fromEntries(Object.entries(deathsPerLevel).map(([k, v]) => [k, v])),
         totalDeaths,
       });
@@ -67,6 +70,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       maxUnlocked: 1,
       deathsPerLevel: {},
       completedLevels: new Set(),
+      skippedLevels: new Set(),
       totalDeaths: 0,
       screen: "menu",
       currentLevel: 1,
@@ -76,6 +80,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({
       maxUnlocked: p.maxUnlocked,
       completedLevels: new Set(p.completedLevels),
+      skippedLevels: new Set(p.skippedLevels ?? []),
       deathsPerLevel: Object.fromEntries(Object.entries(p.deathsPerLevel).map(([k, v]) => [Number(k), v])),
       totalDeaths: p.totalDeaths,
     }),
