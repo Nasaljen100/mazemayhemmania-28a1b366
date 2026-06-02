@@ -71,6 +71,7 @@ export default function App() {
       useAccountStore.getState().saveProgress({
         maxUnlocked: gs.maxUnlocked,
         completedLevels: Array.from(gs.completedLevels),
+        skippedLevels: Array.from(gs.skippedLevels),
         deathsPerLevel: Object.fromEntries(
           Object.entries(gs.deathsPerLevel).map(([k, v]) => [k, v])
         ),
