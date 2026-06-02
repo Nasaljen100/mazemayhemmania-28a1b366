@@ -16,6 +16,12 @@ const MOVE_SPEED = 2.6;
 const PLAYER_W = 14;
 const PLAYER_H = 18;
 const MAX_FALL = 10;
+const COYOTE_MS = 110;
+const BUFFER_MS = 140;
+const DASH_MS = 160;
+const DASH_SPEED = 6.2;
+const DASH_COOLDOWN_MS = 650;
+const MAX_JUMPS = 2;
 
 interface Player {
   x: number; y: number;
@@ -25,6 +31,12 @@ interface Player {
   deathTimer: number;
   facingRight: boolean;
   walkTimer: number;
+  jumpsLeft: number;
+  coyote: number;
+  buffer: number;
+  dashTimer: number;
+  dashCooldown: number;
+  dashDir: number;
 }
 
 function rectOverlap(ax: number, ay: number, aw: number, ah: number,
@@ -135,45 +147,50 @@ function drawDoor(ctx: CanvasRenderingContext2D, door: LevelData["door"], won: b
   }
 }
 
-function drawLocalPlayer(ctx: CanvasRenderingContext2D, p: Player, accent: string) {
-  if (p.dead && Math.floor(p.deathTimer / 70) % 2 === 0) return;
-  const isJump = !p.onGround && p.vy < 0;
+// Solid pixel block matching the main-game player look (no face, outline + highlights).
+function drawBlockPlayer(ctx: CanvasRenderingContext2D, x: number, y: number, vy: number, onGround: boolean, facingRight: boolean, accent: string, ghost = false) {
+  const W = PLAYER_W, H = PLAYER_H;
+  const isJump = !onGround && vy < 0;
+  const isFall = !onGround && vy > 0;
   ctx.save();
-  if (!p.facingRight) { ctx.translate(p.x + PLAYER_W, 0); ctx.scale(-1, 1); ctx.translate(-p.x, 0); }
-  // Body
-  px(ctx, p.x, p.y + 6, PLAYER_W, PLAYER_H - 6, accent);
-  px(ctx, p.x + 1, p.y + 1, PLAYER_W - 2, 7, "#ffddbb");
-  // Eyes
-  px(ctx, p.x + 2, p.y + 2, 3, 3, "#fff");
-  px(ctx, p.x + 8, p.y + 2, 3, 3, "#fff");
-  px(ctx, p.x + 3, p.y + 3, 2, 2, "#222");
-  px(ctx, p.x + 9, p.y + 3, 2, 2, "#222");
-  if (isJump) { px(ctx, p.x + 3, p.y + 4, 8, 1, "#222"); }
-  else { px(ctx, p.x + 3, p.y + 5, 2, 1, "#aa5555"); px(ctx, p.x + 8, p.y + 5, 2, 1, "#aa5555"); }
-  // Legs
-  const lf = Math.floor(Date.now() / 120) % 2;
-  if (!p.onGround) { px(ctx, p.x + 1, p.y + PLAYER_H, 4, 4, accent); px(ctx, p.x + PLAYER_W - 5, p.y + PLAYER_H, 4, 4, accent); }
-  else if (lf === 0) { px(ctx, p.x + 1, p.y + PLAYER_H - 2, 4, 6, accent); px(ctx, p.x + PLAYER_W - 5, p.y + PLAYER_H, 4, 4, accent); }
-  else { px(ctx, p.x + 1, p.y + PLAYER_H, 4, 4, accent); px(ctx, p.x + PLAYER_W - 5, p.y + PLAYER_H - 2, 4, 6, accent); }
+  if (!facingRight) { ctx.translate(x + W, y); ctx.scale(-1, 1); ctx.translate(-x, -y); }
+  if (ghost) ctx.globalAlpha = 0.8;
+  // Ground shadow
+  ctx.fillStyle = "rgba(0,0,0,0.22)";
+  ctx.fillRect(Math.round(x + 1), Math.round(y + H), W - 2, 3);
+  const sy = isJump ? 1.1 : isFall ? 1.07 : 1;
+  const sx = isJump ? 0.92 : isFall ? 0.93 : 1;
+  ctx.save();
+  ctx.translate(Math.round(x + W / 2), Math.round(y + H));
+  ctx.scale(sx, sy);
+  ctx.translate(-Math.round(W / 2), -H);
+  px(ctx, 0, 0, W, H, accent);
+  ctx.fillStyle = "rgba(0,0,0,0.5)";
+  ctx.fillRect(0, 0, W, 1); ctx.fillRect(0, H - 1, W, 1);
+  ctx.fillRect(0, 0, 1, H); ctx.fillRect(W - 1, 0, 1, H);
+  px(ctx, 1, 1, W - 2, 2, "rgba(255,255,255,0.28)");
+  px(ctx, 1, H - 3, W - 2, 2, "rgba(0,0,0,0.25)");
+  ctx.restore();
   ctx.restore();
 }
 
-function drawRemotePlayer(ctx: CanvasRenderingContext2D, rp: { x: number; y: number; facingRight: boolean; dead: boolean; username: string; colorIndex: number }) {
+function drawLocalPlayer(ctx: CanvasRenderingContext2D, p: Player, accent: string) {
+  if (p.dead && Math.floor(p.deathTimer / 70) % 2 === 0) return;
+  // Dash trail
+  if (p.dashTimer > 0) {
+    for (let i = 1; i < 4; i++) {
+      ctx.globalAlpha = 0.4 / i;
+      px(ctx, p.x - p.dashDir * i * 4, p.y, PLAYER_W, PLAYER_H, accent);
+    }
+    ctx.globalAlpha = 1;
+  }
+  drawBlockPlayer(ctx, p.x, p.y, p.vy, p.onGround, p.facingRight, accent, false);
+}
+
+function drawRemotePlayer(ctx: CanvasRenderingContext2D, rp: { x: number; y: number; facingRight: boolean; onGround: boolean; dead: boolean; username: string; colorIndex: number }) {
   if (rp.dead) return;
   const color = PLAYER_COLORS[rp.colorIndex] ?? "#22bbff";
-  ctx.save();
-  if (!rp.facingRight) { ctx.translate(rp.x + PLAYER_W, 0); ctx.scale(-1, 1); ctx.translate(-rp.x, 0); }
-  // Ghost-like remote player
-  ctx.globalAlpha = 0.8;
-  px(ctx, rp.x, rp.y + 6, PLAYER_W, PLAYER_H - 6, color);
-  px(ctx, rp.x + 1, rp.y + 1, PLAYER_W - 2, 7, "#cceeff");
-  px(ctx, rp.x + 2, rp.y + 2, 3, 3, "#fff");
-  px(ctx, rp.x + 8, rp.y + 2, 3, 3, "#fff");
-  px(ctx, rp.x + 3, rp.y + 3, 2, 2, "#333");
-  px(ctx, rp.x + 9, rp.y + 3, 2, 2, "#333");
-  ctx.globalAlpha = 1;
-  ctx.restore();
-
+  drawBlockPlayer(ctx, rp.x, rp.y, 0, rp.onGround, rp.facingRight, color, true);
   // Name tag above head
   ctx.save();
   ctx.font = "bold 6px 'Courier New', monospace";
@@ -214,8 +231,13 @@ export default function MultiplayerGame({ lobbyId, startLevel, onExit }: Props) 
 
   const levelNumRef = useRef(startLevel);
   const levelRef = useRef<LevelData>(generateLevel(startLevel));
-  const playerRef = useRef<Player>({ x: 0, y: 0, vx: 0, vy: 0, onGround: false, dead: false, deathTimer: 0, facingRight: true, walkTimer: 0 });
-  const keysRef = useRef({ left: false, right: false, jumpJustPressed: false });
+  const playerRef = useRef<Player>({
+    x: 0, y: 0, vx: 0, vy: 0, onGround: false, dead: false, deathTimer: 0,
+    facingRight: true, walkTimer: 0,
+    jumpsLeft: MAX_JUMPS, coyote: 0, buffer: 0,
+    dashTimer: 0, dashCooldown: 0, dashDir: 1,
+  });
+  const keysRef = useRef({ left: false, right: false, jumpJustPressed: false, dashJustPressed: false });
   const camXRef = useRef(0);
   const winTimerRef = useRef(-1);
   const remoteRef = useRef(remotePlayers);
@@ -233,6 +255,8 @@ export default function MultiplayerGame({ lobbyId, startLevel, onExit }: Props) 
     p.x = lv.playerStart.x; p.y = lv.playerStart.y;
     p.vx = 0; p.vy = 0; p.onGround = false;
     p.dead = false; p.deathTimer = 0;
+    p.jumpsLeft = MAX_JUMPS; p.coyote = 0; p.buffer = 0;
+    p.dashTimer = 0; p.dashCooldown = 0;
     camXRef.current = 0; winTimerRef.current = -1;
     hasDiedRef.current = false;
     hasWonRef.current = false;
@@ -278,6 +302,7 @@ export default function MultiplayerGame({ lobbyId, startLevel, onExit }: Props) 
       if (e.code === "ArrowLeft" || e.code === "KeyA") k.left = true;
       if (e.code === "ArrowRight" || e.code === "KeyD") k.right = true;
       if ((e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") && !e.repeat) k.jumpJustPressed = true;
+      if ((e.code === "ShiftLeft" || e.code === "ShiftRight" || e.code === "KeyJ" || e.code === "KeyX") && !e.repeat) k.dashJustPressed = true;
       if (e.code === "KeyF") toggleFS();
       if (e.code === "Escape") onExit();
       e.preventDefault();
@@ -330,19 +355,54 @@ export default function MultiplayerGame({ lobbyId, startLevel, onExit }: Props) 
       const goL = k.left || mob.left;
       const goR = k.right || mob.right;
       const jump = k.jumpJustPressed || mob.jumpPressed;
+      const dash = k.dashJustPressed || mob.dashPressed;
       k.jumpJustPressed = false;
+      k.dashJustPressed = false;
       mob.jumpPressed = false;
+      mob.dashPressed = false;
 
-      p.vx = 0;
-      if (goL) { p.vx = -MOVE_SPEED; p.facingRight = false; }
-      if (goR) { p.vx = MOVE_SPEED; p.facingRight = true; }
-      if (goL && goR) p.vx = 0;
+      if (p.coyote > 0) p.coyote -= FDT;
+      if (p.buffer > 0) p.buffer -= FDT;
+      if (p.dashTimer > 0) p.dashTimer -= FDT;
+      if (p.dashCooldown > 0) p.dashCooldown -= FDT;
+      if (jump) p.buffer = BUFFER_MS;
 
-      if (jump && p.onGround) { p.vy = JUMP_VY; p.onGround = false; sounds.jump(); }
-      p.vy = Math.min(p.vy + GRAVITY, MAX_FALL);
+      if (p.dashTimer > 0) {
+        p.vx = DASH_SPEED * p.dashDir;
+        if (goL) p.facingRight = false;
+        if (goR) p.facingRight = true;
+      } else {
+        p.vx = 0;
+        if (goL) { p.vx = -MOVE_SPEED; p.facingRight = false; }
+        if (goR) { p.vx = MOVE_SPEED; p.facingRight = true; }
+        if (goL && goR) p.vx = 0;
+      }
+
+      if (dash && p.dashCooldown <= 0 && p.dashTimer <= 0) {
+        p.dashTimer = DASH_MS;
+        p.dashCooldown = DASH_COOLDOWN_MS;
+        p.dashDir = goL && !goR ? -1 : goR && !goL ? 1 : (p.facingRight ? 1 : -1);
+        p.vy = 0;
+        sounds.jump();
+      }
+
+      if (p.buffer > 0) {
+        if (p.onGround || p.coyote > 0) {
+          p.vy = JUMP_VY; p.onGround = false; p.coyote = 0; p.buffer = 0;
+          p.jumpsLeft = MAX_JUMPS - 1;
+          sounds.jump();
+        } else if (p.jumpsLeft > 0) {
+          p.vy = JUMP_VY * 0.92; p.jumpsLeft -= 1; p.buffer = 0;
+          sounds.jump();
+        }
+      }
+
+      if (p.dashTimer > 0) p.vy = 0;
+      else p.vy = Math.min(p.vy + GRAVITY, MAX_FALL);
 
       p.x += p.vx;
       p.x = Math.max(0, Math.min(p.x, lv.widthPx - PLAYER_W));
+      const wasOnG = p.onGround;
       p.onGround = false;
       for (const plat of lv.platforms) resolveX(p, plat);
 
@@ -359,6 +419,12 @@ export default function MultiplayerGame({ lobbyId, startLevel, onExit }: Props) 
         }
       }
       wasOnGroundRef.current = p.onGround;
+      if (p.onGround) {
+        p.jumpsLeft = MAX_JUMPS;
+        p.coyote = COYOTE_MS;
+      } else if (wasOnG && p.vy >= 0) {
+        p.coyote = COYOTE_MS;
+      }
 
       for (const plat of lv.platforms) {
         if (plat.disappearing) { plat.alpha -= 0.025; if (plat.alpha <= 0) { plat.alpha = 0; plat.gone = true; } }
