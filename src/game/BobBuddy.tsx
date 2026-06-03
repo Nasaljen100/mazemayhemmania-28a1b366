@@ -29,6 +29,7 @@ export default function BobBuddy() {
   const [showAsk, setShowAsk] = useState(false);
   const [question, setQuestion] = useState("");
   const [thinking, setThinking] = useState(false);
+  const [chat, setChat] = useState<{ role: "you" | "bob"; text: string }[]>([]);
   const lastLevelRef = useRef<number>(-1);
 
   function pickFallback(lv: number) {
@@ -71,11 +72,16 @@ export default function BobBuddy() {
   async function sendQuestion() {
     const q = question.trim();
     if (!q) return;
+    setChat((c) => [...c, { role: "you", text: q }]);
+    setQuestion("");
     setThinking(true);
     try {
       const res: any = await ask({ data: { level, question: q } });
-      setText(res?.reply ?? "(BOB shrugged)");
-      setTyped(""); setVisible(true); setShowAsk(false); setQuestion("");
+      const reply = res?.reply ?? "(BOB shrugged)";
+      setChat((c) => [...c, { role: "bob", text: reply }]);
+      setText(reply); setTyped(""); setVisible(true);
+    } catch (e: any) {
+      setChat((c) => [...c, { role: "bob", text: `⚠️ ${e?.message ?? "failed to reach BOB"}` }]);
     } finally { setThinking(false); }
   }
 
@@ -102,10 +108,23 @@ export default function BobBuddy() {
         <div style={{
           position: "fixed", top: 12, right: 12, zIndex: 52,
           background: "#0d1520", border: "3px solid #22bbff",
-          padding: 10, width: 280, fontFamily: "'Courier New', monospace",
+          padding: 10, width: 320, maxHeight: "80vh", display: "flex", flexDirection: "column",
+          fontFamily: "'Courier New', monospace",
           boxShadow: "0 0 20px rgba(34,187,255,0.4)",
         }}>
-          <div style={{ color: "#22bbff", fontWeight: "bold", fontSize: 11, marginBottom: 6 }}>ASK BOB ANYTHING</div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+            <div style={{ color: "#22bbff", fontWeight: "bold", fontSize: 11 }}>ASK BOB ANYTHING</div>
+            <button onClick={() => setShowAsk(false)} style={{ background: "transparent", color: "#fff", border: "none", cursor: "pointer", fontSize: 14 }}>✕</button>
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", maxHeight: 260, marginBottom: 6, padding: 4, background: "#000", border: "1px solid #22bbff44" }}>
+            {chat.length === 0 && <div style={{ color: "#888", fontSize: 10 }}>Ask BOB anything about the game — tips, lore, controls.</div>}
+            {chat.map((m, i) => (
+              <div key={i} style={{ marginBottom: 4, color: m.role === "you" ? "#ffee22" : "#22bbff", fontSize: 11 }}>
+                <b>{m.role === "you" ? "YOU" : "BOB"}:</b> {m.text}
+              </div>
+            ))}
+            {thinking && <div style={{ color: "#888", fontSize: 10 }}>BOB is thinking…</div>}
+          </div>
           <input
             value={question} onChange={e => setQuestion(e.target.value)}
             onKeyDown={e => { if (e.key === "Enter") sendQuestion(); }}
@@ -113,12 +132,9 @@ export default function BobBuddy() {
             style={{ width: "100%", padding: 6, background: "#000", color: "#fff", border: "1px solid #22bbff", fontSize: 12, fontFamily: "inherit" }}
             autoFocus
           />
-          <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
-            <button onClick={sendQuestion} disabled={thinking} style={{ flex: 1, padding: 6, background: "#22bbff", color: "#000", border: "none", fontWeight: "bold", cursor: "pointer", fontSize: 11 }}>
-              {thinking ? "..." : "SEND"}
-            </button>
-            <button onClick={() => setShowAsk(false)} style={{ padding: 6, background: "#333", color: "#fff", border: "none", cursor: "pointer", fontSize: 11 }}>✕</button>
-          </div>
+          <button onClick={sendQuestion} disabled={thinking} style={{ marginTop: 6, padding: 8, background: "#22bbff", color: "#000", border: "none", fontWeight: "bold", cursor: "pointer", fontSize: 11 }}>
+            {thinking ? "..." : "SEND"}
+          </button>
         </div>
       )}
 
