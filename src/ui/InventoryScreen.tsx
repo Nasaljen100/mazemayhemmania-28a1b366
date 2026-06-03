@@ -5,7 +5,7 @@ import { useGameStore } from "../store/gameStore";
 import { useAccountStore } from "../store/accountStore";
 import { useInventoryStore } from "../store/inventoryStore";
 import { CharacterSprite } from "./CharacterSprite";
-import { getCharacter, getCharacterCatalog, RARITY_COLOR, upgradeCostFor, upgradedAbility } from "../game/characters";
+import { getCharacterCatalog, RARITY_COLOR, upgradeCostFor, upgradedAbility, type Rarity } from "../game/characters";
 
 export default function InventoryScreen() {
   const setScreen = useGameStore((s) => s.setScreen);
@@ -81,10 +81,10 @@ export default function InventoryScreen() {
             const owned = inv.badges.find((x) => x.badge_id === b.id);
             const isEquipped = owned?.equipped;
             return (
-              <div key={b.id} style={{ background: "#0e1422", border: `2px solid ${RARITY_COLOR[b.rarity as any] ?? "#888"}`, padding: 10, textAlign: "center", opacity: owned ? 1 : 0.35 }}>
+              <div key={b.id} style={{ background: "#0e1422", border: `2px solid ${(RARITY_COLOR as Record<string,string>)[b.rarity] ?? "#888"}`, padding: 10, textAlign: "center", opacity: owned ? 1 : 0.35 }}>
                 <div style={{ fontSize: 32 }}>{b.icon}</div>
                 <div style={{ fontWeight: "bold" }}>{b.name}</div>
-                <div style={{ fontSize: 9, color: RARITY_COLOR[b.rarity as any] ?? "#888", textTransform: "uppercase" }}>{b.rarity}</div>
+                <div style={{ fontSize: 9, color: (RARITY_COLOR as Record<string,string>)[b.rarity] ?? "#888", textTransform: "uppercase" }}>{b.rarity}</div>
                 <div style={{ fontSize: 10, color: "#888", margin: "6px 0" }}>{b.description}</div>
                 {owned && <button onClick={() => equipB(b.id)} style={{ ...btn(isEquipped), width: "100%" }}>{isEquipped ? "EQUIPPED" : "EQUIP"}</button>}
                 {!owned && !b.obtainable && <div style={{ fontSize: 9, color: "#ff6666" }}>UNOBTAINABLE</div>}
