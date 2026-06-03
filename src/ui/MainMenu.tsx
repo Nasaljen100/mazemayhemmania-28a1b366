@@ -229,6 +229,13 @@ export default function MainMenu() {
           </div>
         )}
 
+        {user && (
+          <div style={{ display: "flex", gap: 8, width: "100%" }}>
+            <MenuBtn label="🛒 SHOP" color="#1a6677" glow="#0a4455" onClick={() => { sounds.menuClick(); setScreen("shop" as any); }} half />
+            <MenuBtn label="🎒 INVENTORY" color="#664488" glow="#442266" onClick={() => { sounds.menuClick(); setScreen("inventory" as any); }} half />
+          </div>
+        )}
+
         <MenuBtn label="⛶  FULLSCREEN" color="#282828" glow="#111" onClick={() => { sounds.menuClick(); toggleFullscreen(); }} />
         {user?.isModerator && (
           <MenuBtn

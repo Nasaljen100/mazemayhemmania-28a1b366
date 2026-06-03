@@ -18,6 +18,9 @@ import WeeklyChallenges from "./ui/WeeklyChallenges";
 import UpdateOverlay from "./ui/UpdateOverlay";
 import BobBuddy from "./game/BobBuddy";
 import JohnChat from "./ui/JohnChat";
+import ShopScreen from "./ui/ShopScreen";
+import InventoryScreen from "./ui/InventoryScreen";
+import { useInventoryStore } from "./store/inventoryStore";
 import { useLiveConfigStore } from "./store/liveConfigStore";
 import { useState } from "react";
 import { startLevelValidator } from "./game/levelValidator";
@@ -26,7 +29,7 @@ import "./game-styles.css";
 type Screen =
   | "menu" | "levelselect" | "playing" | "practice"
   | "auth" | "quests" | "friends" | "lobby" | "multiplayer"
-  | "leaderboard" | "weekly";
+  | "leaderboard" | "weekly" | "shop" | "inventory";
 
 export default function App() {
   const screen = useGameStore((s) => s.screen) as Screen;
@@ -44,6 +47,9 @@ export default function App() {
   const lobbyLevel = useMultiplayerStore((s) => s.currentLevel);
   const connect = useMultiplayerStore((s) => s.connect);
   const disconnect = useMultiplayerStore((s) => s.disconnect);
+  const refreshInv = useInventoryStore((s) => s.refresh);
+
+  useEffect(() => { if (user?.id) refreshInv(user.id); }, [user?.id]);
 
   useEffect(() => {
     // Best-effort session restore. May fail if the backend is unreachable.
@@ -101,6 +107,8 @@ export default function App() {
       {screen === "friends" && <FriendsScreen onBack={() => setScreen("menu")} />}
       {screen === "leaderboard" && <Leaderboard />}
       {screen === "weekly" && <WeeklyChallenges />}
+      {screen === "shop" && <ShopScreen />}
+      {screen === "inventory" && <InventoryScreen />}
       {screen === "lobby" && (
         <LobbyScreen
           onStart={() => setScreen("multiplayer")}
