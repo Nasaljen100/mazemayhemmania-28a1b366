@@ -5,7 +5,7 @@ import { useGameStore } from "../store/gameStore";
 import { useAccountStore } from "../store/accountStore";
 import { useInventoryStore } from "../store/inventoryStore";
 import { CharacterSprite } from "./CharacterSprite";
-import { BOXES, getCharacter, RARITY_COLOR } from "../game/characters";
+import { BOXES, getCharacter, RARITY_COLOR, type Rarity } from "../game/characters";
 
 export default function ShopScreen() {
   const setScreen = useGameStore((s) => s.setScreen);
@@ -95,7 +95,7 @@ export default function ShopScreen() {
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 12, color: "#aaa", letterSpacing: 3 }}>YOU GOT</div>
             <CharacterSprite id={reveal.id} size={200} />
-            <div style={{ fontSize: 22, color: RARITY_COLOR[reveal.rarity as any], fontWeight: "bold", marginTop: 12 }}>{reveal.name}</div>
+            <div style={{ fontSize: 22, color: RARITY_COLOR[reveal.rarity as Rarity], fontWeight: "bold", marginTop: 12 }}>{reveal.name}</div>
             <div style={{ fontSize: 12, color: "#888", textTransform: "uppercase", letterSpacing: 2 }}>{reveal.rarity}</div>
             <div style={{ fontSize: 10, color: "#666", marginTop: 12 }}>click anywhere</div>
           </div>
