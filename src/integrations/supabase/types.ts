@@ -38,6 +38,33 @@ export type Database = {
         }
         Relationships: []
       }
+      badges: {
+        Row: {
+          description: string
+          icon: string
+          id: number
+          name: string
+          obtainable: boolean
+          rarity: string
+        }
+        Insert: {
+          description?: string
+          icon: string
+          id: number
+          name: string
+          obtainable?: boolean
+          rarity: string
+        }
+        Update: {
+          description?: string
+          icon?: string
+          id?: number
+          name?: string
+          obtainable?: boolean
+          rarity?: string
+        }
+        Relationships: []
+      }
       broadcasts: {
         Row: {
           created_at: string
@@ -219,6 +246,86 @@ export type Database = {
           id?: string
           updated_at?: string
           username?: string
+          xp?: number
+        }
+        Relationships: []
+      }
+      shop_stock: {
+        Row: {
+          id: number
+          restocked_at: string
+          slots: Json
+        }
+        Insert: {
+          id?: number
+          restocked_at?: string
+          slots?: Json
+        }
+        Update: {
+          id?: number
+          restocked_at?: string
+          slots?: Json
+        }
+        Relationships: []
+      }
+      user_badges: {
+        Row: {
+          badge_id: number
+          earned_at: string
+          equipped: boolean
+          id: string
+          user_id: string
+        }
+        Insert: {
+          badge_id: number
+          earned_at?: string
+          equipped?: boolean
+          id?: string
+          user_id: string
+        }
+        Update: {
+          badge_id?: number
+          earned_at?: string
+          equipped?: boolean
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_badges_badge_id_fkey"
+            columns: ["badge_id"]
+            isOneToOne: false
+            referencedRelation: "badges"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_characters: {
+        Row: {
+          acquired_at: string
+          character_id: number
+          equipped: boolean
+          id: string
+          upgrade_level: number
+          user_id: string
+          xp: number
+        }
+        Insert: {
+          acquired_at?: string
+          character_id: number
+          equipped?: boolean
+          id?: string
+          upgrade_level?: number
+          user_id: string
+          xp?: number
+        }
+        Update: {
+          acquired_at?: string
+          character_id?: number
+          equipped?: boolean
+          id?: string
+          upgrade_level?: number
+          user_id?: string
           xp?: number
         }
         Relationships: []

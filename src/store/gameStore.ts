@@ -3,7 +3,7 @@ import { create } from "zustand";
 export type AppScreen =
   | "menu" | "levelselect" | "playing" | "practice"
   | "auth" | "quests" | "friends" | "lobby" | "multiplayer"
-  | "leaderboard" | "weekly" | "settings";
+  | "leaderboard" | "weekly" | "settings" | "shop" | "inventory";
 
 export interface GameStore {
   screen: AppScreen;
